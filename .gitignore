@@ -5,27 +5,32 @@
 .secrets
 .dev.vars
 .demo.vars
+deno.lock
 *.pem
 *.key
 *.cert
 
 # 2. Dependencies
-node_modules/
+**/node_modules/
 
-# 3. Database & Local Data
+# 3. Build & Temp (Netlify Local Dev)
+.netlify/
+.functions-serve/
+npm-debug.log*
+
+# 4. Database & Local Data
 *.db
 *.db-journal
-*.db-shm
 *.db-wal
 **/*.db*
 
-# 3. Developer Tools & IDEs
+# 5. Developer Tools & IDEs
 .DS_Store
 .vscode/
 .idea/
 .wrangler/
 
-# 4. Agentic AI & Local Scripts
+# 6. Agentic AI & Local Scripts
 .antigravity
 .gemini/
 .agent/

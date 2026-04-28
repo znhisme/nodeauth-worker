@@ -12,16 +12,12 @@ jobs:
     name: "Build and push Docker images"
     permissions:
       contents: read
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Inject Commit Hash & Platform
-      env:
-        DIST_PLATFORM: "Docker"
-        DIST_ICON_SUFFIX: "docker"
-      run: node scripts/inject_vars.js
+      run: node scripts/inject_vars.js --platform=docker
 
     - name: Login to DockerHub
       uses: docker/login-action@v3

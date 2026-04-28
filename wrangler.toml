@@ -1,10 +1,10 @@
 name = "nodeauth-worker"
-main = "backend/dist/worker.js" 
+main = "backend/dist/worker/worker.js" 
 compatibility_date = "2026-03-17"
 compatibility_flags = ["nodejs_compat"]
 
 [build]
-command = "node scripts/inject_vars.js"
+command = "node scripts/inject_vars.js --platform=cloudflare"
 
 [assets]
 binding = "ASSETS"

@@ -9,9 +9,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    name: "Deploy to Cloudflare Workers"
     permissions:
       contents: read
-    name: Deploy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,6 +114,9 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: '4.75.0'
           command: d1 execute ${{ secrets.CLOUDFLARE_D1_DATABASE_NAME || 'nodeauth-db' }} --remote --file=backend/schema.sql
+
+      - name: Inject Commit Hash & Platform
+        run: node scripts/inject_vars.js --platform=cloudflare
 
       - name: Generate Secret List
         id: secret_list

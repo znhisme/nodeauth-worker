@@ -1,0 +1,24 @@
+[build]
+  publish = "frontend/dist"
+  functions = "backend/dist/netlify"
+  command = "npm install --prefix backend && node scripts/inject_vars.js --platform=netlify"
+
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["better-sqlite3", "pg", "mysql2", "nodemailer", "cloudflare:sockets"]
+  included_files = ["!backend/dist/worker.js", "!backend/dist/server.js"]
+
+[functions."api"]

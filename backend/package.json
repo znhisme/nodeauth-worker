@@ -6,6 +6,7 @@
     "deploy": "wrangler deploy --minify ./src/app/worker.ts",
     "build:docker": "node scripts/build-docker.js",
     "build:worker": "node scripts/build-worker.js",
+    "build:netlify": "node scripts/build-netlify.js",
     "test": "vitest run"
   },
   "dependencies": {

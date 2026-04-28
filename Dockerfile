@@ -48,4 +48,4 @@ USER node
 EXPOSE 3000
 
 # Start command
-CMD ["node", "backend/dist/server.js"]
+CMD ["node", "backend/dist/docker/server.js"]

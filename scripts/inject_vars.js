@@ -10,22 +10,44 @@ const { execSync } = require('child_process');
 
 function getCommitHash() {
     try {
-        // Try to get the short SHA from Git
         return execSync('git rev-parse --short HEAD').toString().trim();
     } catch (e) {
-        // Fallback or use environment variable if git is not available
         return process.env.GITHUB_SHA ? process.env.GITHUB_SHA.substring(0, 7) : 'unknown';
     }
 }
 
+/**
+ * Platform Detection Logic (Embedded for standalone distribution compatibility)
+ */
+const PLATFORM_REGISTRY = [
+    { name: 'Netlify', suffix: 'netlify', envKeys: ['NETLIFY', 'NETLIFY_SITE_ID'] },
+    { name: 'Docker', suffix: 'docker', envKeys: ['DOCKER_BUILD'] },
+    { name: 'Cloudflare Workers', suffix: 'cloudflare', envKeys: [] },
+];
+
+function detectPlatform(env = process.env) {
+    const explicit = PLATFORM_REGISTRY.find(p => p.suffix === env.DEPLOY_PLATFORM);
+    if (explicit) return explicit;
+
+    const fingerprinted = PLATFORM_REGISTRY.find(p => p.envKeys.some(k => !!env[k]));
+    if (fingerprinted) return fingerprinted;
+
+    return PLATFORM_REGISTRY.at(-1);
+}
+
+// Support --platform=<suffix> CLI arg as an override
+const platformArg = process.argv.find(arg => arg.startsWith('--platform='));
+if (platformArg) {
+    process.env.DEPLOY_PLATFORM = platformArg.split('=')[1];
+}
+
 const commitHash = getCommitHash();
-const platform = process.env.DIST_PLATFORM || 'Cloudflare Workers';
-const iconSuffix = process.env.DIST_ICON_SUFFIX || 'cloudflare';
+const platform = detectPlatform();
 
 console.log(`💉 Injecting variables:`);
 console.log(`   - Commit: ${commitHash}`);
-console.log(`   - Platform: ${platform}`);
-console.log(`   - Icon Suffix: ${iconSuffix}`);
+console.log(`   - Platform: ${platform.name}`);
+console.log(`   - Icon Suffix: ${platform.suffix}`);
 
 function replaceInDir(dir, replacements) {
     if (!fs.existsSync(dir)) {
@@ -33,8 +55,6 @@ function replaceInDir(dir, replacements) {
         return;
     }
 
-    // Use withFileTypes to get Dirent objects directly, avoiding separate statSync calls
-    // and fixing CodeQL js/file-system-race security warnings.
     const entries = fs.readdirSync(dir, { withFileTypes: true });
 
     entries.forEach(entry => {
@@ -75,8 +95,8 @@ const searchPaths = [
 
 const replacements = {
     '__DIST_COMMIT_HASH__': commitHash,
-    '__DIST_PLATFORM__': platform,
-    '__DIST_ICON_SUFFIX__': iconSuffix
+    '__DIST_PLATFORM__': platform.name,
+    '__DIST_ICON_SUFFIX__': platform.suffix
 };
 
 searchPaths.forEach(distPath => {
