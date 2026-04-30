@@ -1,0 +1,43 @@
+# 1. Environment & Secrets (STRICT - DO NOT COMMIT)
+.env
+.env.*
+!.env.example
+.secrets
+.dev.vars
+.demo.vars
+deno.lock
+*.pem
+*.key
+*.cert
+
+# 2. Dependencies
+**/node_modules/
+
+# 3. Build & Temp (Netlify Local Dev)
+.netlify/
+.vercel/
+.functions-serve/
+npm-debug.log*
+backend/
+
+# 4. Database & Local Data
+*.db
+*.db-journal
+*.db-wal
+**/*.db*
+
+# 5. Developer Tools & IDEs
+.DS_Store
+.vscode/
+.idea/
+.wrangler/
+
+# 6. Agentic AI & Local Scripts
+.antigravity
+.gemini/
+.agent/
+.agents/
+.act/
+.actrc
+.event
+.example/

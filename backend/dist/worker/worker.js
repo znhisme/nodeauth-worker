@@ -56374,7 +56374,7 @@ async function sendEmail(smtp, subject, body, filename, attachmentData) {
     isRealNode = false;
   }
   if (isRealNode) {
-    const nodemailer = await new Function("m", "return import(m)")("nodemailer");
+    const nodemailer = await import("nodemailer");
     const transporter = nodemailer.createTransport({
       host: smtp.host,
       port: smtp.port,

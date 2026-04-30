@@ -1,6 +1,6 @@
 {
     "name": "nodeauth-worker",
-    "version": "2.2.25",
+    "version": "2.2.26",
     "description": "High-security, Lightweight 2FA/TOTP management tool (Distribution Version)",
     "author": "nodeauth",
     "license": "AGPL-3.0",
@@ -8,7 +8,11 @@
     "scripts": {
         "deploy": "npx wrangler deploy --minify"
     },
-    "devDependencies": {
-        "wrangler": "4.75.0"
+    "dependencies": {
+        "better-sqlite3": "^12.8.0",
+        "pg": "^8.20.0",
+        "mysql2": "^3.20.0",
+        "hono": "^4.12.12",
+        "nodemailer": "^8.0.5"
     }
 }

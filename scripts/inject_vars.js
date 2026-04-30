@@ -21,6 +21,7 @@ function getCommitHash() {
  */
 const PLATFORM_REGISTRY = [
     { name: 'Netlify', suffix: 'netlify', envKeys: ['NETLIFY', 'NETLIFY_SITE_ID'] },
+    { name: 'Vercel', suffix: 'vercel', envKeys: ['VERCEL', 'VERCEL_PROJECT_ID'] },
     { name: 'Docker', suffix: 'docker', envKeys: ['DOCKER_BUILD'] },
     { name: 'Cloudflare Workers', suffix: 'cloudflare', envKeys: [] },
 ];
@@ -63,7 +64,13 @@ function replaceInDir(dir, replacements) {
 
         if (entry.isDirectory()) {
             replaceInDir(filePath, replacements);
-        } else if (entry.isFile() && (entryName.endsWith('.js') || entryName.endsWith('.html') || entryName.endsWith('.webmanifest'))) {
+        } else if (entry.isFile() && (
+            entryName.endsWith('.js') ||
+            entryName.endsWith('.mjs') ||
+            entryName.endsWith('.html') ||
+            entryName.endsWith('.json') ||
+            entryName.endsWith('.webmanifest')
+        )) {
             try {
                 let content = fs.readFileSync(filePath, 'utf8');
                 let modified = false;
@@ -90,7 +97,8 @@ function replaceInDir(dir, replacements) {
 const rootDir = path.resolve(__dirname, '..');
 const searchPaths = [
     path.join(rootDir, 'frontend/dist'),
-    path.join(rootDir, 'backend/dist')
+    path.join(rootDir, 'backend/dist'),
+    path.join(rootDir, 'api')
 ];
 
 const replacements = {
