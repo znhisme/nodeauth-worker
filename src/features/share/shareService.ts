@@ -147,6 +147,21 @@ export class ShareService {
         }
 
         if (share.expiresAt <= now) {
+            await this.shareRepository.insertAuditEvent({
+                id: createId('share-audit'),
+                shareId: share.id,
+                eventType: 'expired',
+                actorType: 'system',
+                eventAt: now,
+                ownerId: share.ownerId,
+                ipHash: null,
+                userAgentHash: null,
+                metadata: toMetadata({
+                    expiredAt: now,
+                    expiresAt: share.expiresAt,
+                    status: 'expired',
+                }),
+            });
             return { accessible: false, status: 'expired', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
@@ -160,6 +175,22 @@ export class ShareService {
         if (!accessCodeOk) {
             return { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
+
+        await this.shareRepository.markAccessed(share.id, now);
+        await this.shareRepository.insertAuditEvent({
+            id: createId('share-audit'),
+            shareId: share.id,
+            eventType: 'access_granted',
+            actorType: 'recipient',
+            eventAt: now,
+            ownerId: share.ownerId,
+            ipHash: null,
+            userAgentHash: null,
+            metadata: toMetadata({
+                accessedAt: now,
+                status: 'active',
+            }),
+        });
 
         return {
             accessible: true,
