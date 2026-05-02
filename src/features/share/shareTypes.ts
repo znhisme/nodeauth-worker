@@ -32,6 +32,7 @@ export interface ShareLinkRecord {
     revokedAt?: string | null;
     createdAt: string;
     updatedAt: string;
+    publicUrl?: string;
 }
 
 export interface ShareAuditEvent {
@@ -46,7 +47,10 @@ export interface ShareAuditEvent {
 export interface CreateShareInput {
     ownerId: string;
     vaultItemId: string;
+    expiresAt?: number;
     ttlSeconds?: number;
+    now?: number;
+    publicOrigin?: string;
     includePassword?: boolean;
     includeOtp?: boolean;
 }
@@ -61,12 +65,28 @@ export interface ResolveShareAccessInput {
     token: string;
     accessCode?: string;
     requestOrigin?: string;
+    now?: number;
+}
+
+export interface ShareRateLimitInput {
+    key: string;
+    shareId: string;
+    windowMs: number;
+    maxAttempts: number;
+    lockMs: number;
+    now?: number;
+}
+
+export interface ShareRateLimitDecision {
+    allowed: boolean;
+    attempts: number;
+    lockedUntil?: number | null;
 }
 
 export interface ShareAccessDecision {
-    allowed: boolean;
+    accessible: boolean;
     status: ShareStatus;
-    reason?: 'missing_access_code' | 'invalid_access_code' | 'expired' | 'revoked' | 'rate_limited' | 'not_found';
+    reason?: 'inaccessible';
     share?: ShareLinkRecord | null;
     publicHeaders?: Record<string, string>;
     publicUrl?: string;
