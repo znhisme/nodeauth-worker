@@ -44,6 +44,8 @@ The current checkout is a distribution-oriented NodeAuth codebase. Backend sourc
 
 The existing architecture already has the right places for this work: API routes mount through the Hono app, auth middleware protects session-scoped routes, vault data is accessed through shared repositories, and persistent schema is reflected in `backend/schema.sql`. The frontend source is not present in this checkout, so implementation planning must account for whether new UI can be added from available source elsewhere or whether this milestone focuses first on API support.
 
+Phase 1 is complete: editable backend source has been restored, reproducible Worker/Docker/Netlify backend builds are available, the share-link security contract is written, durable share state exists, and below-route primitives now enforce hashed token/access-code storage, expiration, revocation, deleted-item checks, fail-closed share rate limiting, and safe audit events.
+
 The user's framing is practical and direct: "增加api 支持单个账户可以通过http链接的方式共享，方便共享账户给朋友登录." The core workflow is account owner creates link, sends it to a friend, friend opens link, friend can log in using that one shared account's details.
 
 ## Constraints
@@ -59,11 +61,11 @@ The user's framing is practical and direct: "增加api 支持单个账户可以�
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Treat this as a brownfield feature milestone for existing NodeAuth | Codebase map shows a mature existing app with auth, vault, backup, and multi-target deployment | — Pending |
-| Default shared links to expiration plus owner revocation | Sensitive account data should not remain indefinitely accessible after casual sharing | — Pending |
-| Require an independent access code by default | A copied URL should not be sufficient to reveal credentials if chat history or browser history leaks | — Pending |
-| Limit v1 to one vault/account item per share link | Matches the user request and keeps the blast radius understandable | — Pending |
-| Build API support first, then add UI if editable frontend source is available | The checkout contains frontend build output but not obvious frontend source | — Pending |
+| Treat this as a brownfield feature milestone for existing NodeAuth | Codebase map shows a mature existing app with auth, vault, backup, and multi-target deployment | Validated in Phase 1 |
+| Default shared links to expiration plus owner revocation | Sensitive account data should not remain indefinitely accessible after casual sharing | Foundation enforced in Phase 1; API surfaced in Phase 2 |
+| Require an independent access code by default | A copied URL should not be sufficient to reveal credentials if chat history or browser history leaks | Foundation enforced in Phase 1; API surfaced in Phase 2 |
+| Limit v1 to one vault/account item per share link | Matches the user request and keeps the blast radius understandable | Foundation enforced in Phase 1 |
+| Build API support first, then add UI if editable frontend source is available | The checkout contains frontend build output but not obvious frontend source | API-only Phase 1 validated; Phase 2 continues API work |
 
 ## Evolution
 
@@ -83,4 +85,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-02 after initialization*
+*Last updated: 2026-05-02 after Phase 1 completion*
