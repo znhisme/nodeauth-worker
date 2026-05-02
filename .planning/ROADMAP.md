@@ -49,7 +49,12 @@ Plans:
   3. Owner APIs enforce existing auth, session, CSRF, and ownership protections and cannot manage another owner's item or share.
   4. Friend can open a public HTTP share link without an authenticated NodeAuth session and must provide the independent access code through a non-URL request channel.
   5. Friend receives only a minimal `SharedItemView`, including current TOTP code/countdown when available, with generic inaccessible-share errors and no-store/no-referrer protections.
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 02-01-PLAN.md — Add owner-safe share DTOs, owner-scoped repository/service metadata, and recipient OTP SharedItemView generation.
+- [ ] 02-02-PLAN.md — Add authenticated owner share APIs and unauthenticated public recipient access endpoint.
+- [ ] 02-03-PLAN.md — Mount `/api/share` in the root app and redact public share tokens from request logs.
+- [ ] 02-04-PLAN.md — Regenerate and validate Worker, Docker, and Netlify backend bundles from source.
 **UI hint**: yes
 
 ### Phase 3: Cleanup, Compatibility, and Hardening
