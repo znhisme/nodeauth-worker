@@ -7552,6 +7552,11 @@ var ShareService = class {
     if (!vaultItem) {
       return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
+    const accessCode = input.accessCode || "";
+    const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share2.accessCodeHash);
+    if (!accessCodeOk) {
+      return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
     const decryptedSecret = await decryptField(vaultItem.secret, this.env.ENCRYPTION_KEY || this.env.JWT_SECRET || "");
     const period = Number(vaultItem.period || 30);
     const remainingSeconds = period - Math.floor(now / 1e3) % period;
@@ -7573,11 +7578,6 @@ var ShareService = class {
         }
       } : {}
     };
-    const accessCode = input.accessCode || "";
-    const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share2.accessCodeHash);
-    if (!accessCodeOk) {
-      return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
     await this.shareRepository.markAccessed(share2.id, now);
     await this.shareRepository.insertAuditEvent({
       id: createId("share-audit"),
@@ -8132,6 +8132,33 @@ function redactSharePublicToken(value) {
     "/api/share/public/[share-token]/access"
   );
 }
+function normalizeConfiguredOrigin(origin) {
+  const trimmed = origin?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    return new URL(trimmed.replace(/\/+$/, "")).origin;
+  } catch {
+    return null;
+  }
+}
+function resolveApiCorsOrigin(origin, env) {
+  if (!origin) {
+    return null;
+  }
+  const trustedOrigin = normalizeConfiguredOrigin(env.NODEAUTH_PUBLIC_ORIGIN);
+  if (!trustedOrigin) {
+    return null;
+  }
+  let requestOrigin;
+  try {
+    requestOrigin = new URL(origin).origin;
+  } catch {
+    return null;
+  }
+  return requestOrigin === trustedOrigin ? requestOrigin : null;
+}
 app.use("*", async (c, next) => {
   if (c.env) {
     await initializeEnv(c.env);
@@ -8140,7 +8167,7 @@ app.use("*", async (c, next) => {
 });
 app.use("*", hLogger((str) => logger.info(redactSharePublicToken(str))));
 app.use("/api/*", cors({
-  origin: (origin) => origin,
+  origin: (origin, c) => resolveApiCorsOrigin(origin, c.env),
   credentials: true,
   allowHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   allowMethods: ["POST", "GET", "OPTIONS", "PUT", "DELETE"],
