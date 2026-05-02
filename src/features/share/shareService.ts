@@ -172,3 +172,9 @@ export class ShareService {
         };
     }
 }
+
+export function createShareService(env: EnvBindings, db: any = env.DB): ShareService {
+    const vaultRepository = new VaultRepository(db);
+    const shareRepository = new ShareRepository(db);
+    return new ShareService(env, vaultRepository, shareRepository);
+}
