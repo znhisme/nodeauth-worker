@@ -861,7 +861,7 @@ import { drizzle } from "drizzle-orm/d1";
 init_logger();
 init_config();
 init_crypto();
-import { Hono as Hono9 } from "hono";
+import { Hono as Hono10 } from "hono";
 import { cors } from "hono/cors";
 import { logger as hLogger } from "hono/logger";
 import { secureHeaders } from "hono/secure-headers";
@@ -7159,8 +7159,588 @@ tools.get("/server-time", (c) => {
 });
 var toolsRoutes_default = tools;
 
-// ../src/features/health/healthRoutes.ts
+// ../src/features/share/shareRoutes.ts
 import { Hono as Hono6 } from "hono";
+
+// ../src/features/share/shareService.ts
+init_config();
+
+// ../src/shared/db/repositories/shareRepository.ts
+import { and as and5, desc as desc7, eq as eq10, isNull as isNull2, sql as sql2 } from "drizzle-orm";
+var ShareRepository = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async createShareLink(input) {
+    await this.db.insert(shareLinks4).values(input);
+    return await this.findByIdForOwner(input.id, input.ownerId);
+  }
+  async findByTokenHash(tokenHash) {
+    const result = await this.db.select().from(shareLinks4).where(eq10(shareLinks4.tokenHash, tokenHash)).limit(1);
+    return result[0] || null;
+  }
+  async findByIdForOwner(id, ownerId) {
+    const result = await this.db.select().from(shareLinks4).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId))).limit(1);
+    return result[0] || null;
+  }
+  async listForOwner(ownerId) {
+    return await this.db.select().from(shareLinks4).where(eq10(shareLinks4.ownerId, ownerId)).orderBy(desc7(shareLinks4.createdAt));
+  }
+  async revokeForOwner(id, ownerId, revokedAt) {
+    const existing = await this.findByIdForOwner(id, ownerId);
+    if (!existing || existing.revokedAt !== null && existing.revokedAt !== void 0) {
+      return false;
+    }
+    await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
+    return true;
+  }
+  async markAccessed(id, accessedAt) {
+    await this.db.update(shareLinks4).set({
+      lastAccessedAt: accessedAt,
+      accessCount: sql2`coalesce(${shareLinks4.accessCount}, 0) + 1`
+    }).where(eq10(shareLinks4.id, id));
+  }
+  async insertAuditEvent(input) {
+    await this.db.insert(shareAuditEvents4).values(input);
+  }
+  async enforceRateLimit(input) {
+    const now = input.now ?? Date.now();
+    const existing = await this.db.select().from(shareRateLimits4).where(eq10(shareRateLimits4.key, input.key)).limit(1);
+    const current = existing[0];
+    if (!current) {
+      await this.db.insert(shareRateLimits4).values({
+        key: input.key,
+        shareId: input.shareId,
+        attempts: 1,
+        windowStartedAt: now,
+        lastAttemptAt: now,
+        lockedUntil: null
+      });
+      return { allowed: true, attempts: 1, lockedUntil: null };
+    }
+    if (current.lockedUntil && current.lockedUntil > now) {
+      return { allowed: false, attempts: current.attempts || 0, lockedUntil: current.lockedUntil };
+    }
+    const windowExpired = now - current.windowStartedAt >= input.windowMs;
+    const attempts = windowExpired ? 1 : (current.attempts || 0) + 1;
+    const lockedUntil = attempts > input.maxAttempts ? now + input.lockMs : null;
+    await this.db.update(shareRateLimits4).set({
+      shareId: input.shareId,
+      attempts,
+      windowStartedAt: windowExpired ? now : current.windowStartedAt,
+      lastAttemptAt: now,
+      lockedUntil
+    }).where(eq10(shareRateLimits4.key, input.key));
+    return {
+      allowed: lockedUntil === null,
+      attempts,
+      lockedUntil
+    };
+  }
+};
+
+// ../src/features/share/shareService.ts
+init_otp();
+
+// ../src/features/share/shareSecurity.ts
+init_config();
+
+// ../src/features/share/shareTypes.ts
+var SHARE_TOKEN_BYTES = 32;
+var SHARE_ACCESS_CODE_BYTES = 16;
+var SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60;
+var SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+var SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
+var SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
+var SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1e3;
+
+// ../src/features/share/shareSecurity.ts
+var textEncoder = new TextEncoder();
+function encodeBase64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function constantTimeEqual(left, right) {
+  const leftBytes = textEncoder.encode(left);
+  const rightBytes = textEncoder.encode(right);
+  const maxLength = Math.max(leftBytes.length, rightBytes.length);
+  let mismatch = leftBytes.length ^ rightBytes.length;
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftByte = leftBytes[index] ?? 0;
+    const rightByte = rightBytes[index] ?? 0;
+    mismatch |= leftByte ^ rightByte;
+  }
+  return mismatch === 0;
+}
+function getRandomBytes(byteLength) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+function generateShareToken() {
+  return encodeBase64Url(getRandomBytes(SHARE_TOKEN_BYTES));
+}
+function generateAccessCode() {
+  return encodeBase64Url(getRandomBytes(SHARE_ACCESS_CODE_BYTES));
+}
+async function hashShareSecret(pepper, purpose, value) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(pepper),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    textEncoder.encode(`${purpose}:${value}`)
+  );
+  return encodeBase64Url(new Uint8Array(signature));
+}
+async function verifyShareSecret(pepper, purpose, value, hash) {
+  const expectedHash = await hashShareSecret(pepper, purpose, value);
+  return constantTimeEqual(expectedHash, hash);
+}
+function buildShareUrl(publicOrigin, token) {
+  const origin = normalizePublicOrigin(publicOrigin);
+  return new URL(`/share/${token}`, origin).toString();
+}
+function normalizePublicOrigin(publicOrigin) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(publicOrigin);
+  } catch {
+    throw new AppError("invalid_public_origin", 500);
+  }
+  const isHttps = parsedUrl.protocol === "https:";
+  const isLocalHttp = parsedUrl.protocol === "http:" && (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1" || parsedUrl.hostname === "[::1]" || parsedUrl.hostname === "::1");
+  if (!isHttps && !isLocalHttp) {
+    throw new AppError("invalid_public_origin", 500);
+  }
+  return parsedUrl.origin;
+}
+function getSharePublicHeaders() {
+  return {
+    "Cache-Control": "no-store",
+    Pragma: "no-cache",
+    "Referrer-Policy": "no-referrer"
+  };
+}
+function getShareSecretPepper(env) {
+  if (env.SHARE_SECRET_PEPPER) {
+    return env.SHARE_SECRET_PEPPER;
+  }
+  if (env.JWT_SECRET) {
+    return env.JWT_SECRET;
+  }
+  throw new AppError("missing_share_secret_pepper", 500);
+}
+function clampShareTtlSeconds(ttlSeconds) {
+  if (!Number.isFinite(ttlSeconds)) {
+    return SHARE_DEFAULT_TTL_SECONDS;
+  }
+  const normalized = Math.max(1, Math.floor(ttlSeconds));
+  return Math.min(normalized, SHARE_MAX_TTL_SECONDS);
+}
+
+// ../src/features/share/shareService.ts
+var textEncoder2 = new TextEncoder();
+function createId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+function toMetadata(value) {
+  return JSON.stringify(value);
+}
+function toShareStatus(share2, now) {
+  return share2.revokedAt != null ? "revoked" : Number(share2.expiresAt) <= now ? "expired" : "active";
+}
+var ShareService = class {
+  constructor(env, vaultRepository, shareRepository) {
+    this.env = env;
+    this.vaultRepository = vaultRepository;
+    this.shareRepository = shareRepository;
+  }
+  toOwnerMetadataView(share2, vaultItem, now, publicUrl) {
+    return {
+      id: share2.id,
+      item: {
+        id: vaultItem.id,
+        service: vaultItem.service,
+        account: vaultItem.account
+      },
+      status: toShareStatus(share2, now),
+      createdAt: String(share2.createdAt),
+      expiresAt: String(share2.expiresAt),
+      revokedAt: share2.revokedAt != null ? String(share2.revokedAt) : null,
+      lastAccessedAt: share2.lastAccessedAt != null ? String(share2.lastAccessedAt) : null,
+      accessCount: Number(share2.accessCount || 0),
+      ...publicUrl ? { publicUrl } : {}
+    };
+  }
+  async createShare(input) {
+    if (!input.ownerId || !input.vaultItemId) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const now = input.now ?? Date.now();
+    const ttlSeconds = clampShareTtlSeconds(input.ttlSeconds ?? SHARE_DEFAULT_TTL_SECONDS);
+    const expiresAt = input.expiresAt ?? now + ttlSeconds * 1e3;
+    if (expiresAt <= now || expiresAt > now + SHARE_MAX_TTL_SECONDS * 1e3) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+    if (!vaultItem) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const rawToken = generateShareToken();
+    const rawAccessCode = generateAccessCode();
+    const pepper = getShareSecretPepper(this.env);
+    const tokenHash = await hashShareSecret(pepper, "share-token", rawToken);
+    const accessCodeHash = await hashShareSecret(pepper, "share-access-code", rawAccessCode);
+    const shareId = createId("share");
+    const share2 = await this.shareRepository.createShareLink({
+      id: shareId,
+      vaultItemId: input.vaultItemId,
+      ownerId: input.ownerId,
+      tokenHash,
+      accessCodeHash,
+      expiresAt,
+      revokedAt: null,
+      createdAt: now,
+      lastAccessedAt: null,
+      accessCount: 0
+    });
+    const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
+    const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : void 0;
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId: share2.id,
+      eventType: "created",
+      actorType: "owner",
+      eventAt: now,
+      ownerId: input.ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({
+        vaultItemId: input.vaultItemId,
+        expiresAt
+      })
+    });
+    return {
+      share: {
+        id: share2.id,
+        ownerId: share2.ownerId,
+        vaultItemId: share2.vaultItemId,
+        tokenHash: share2.tokenHash,
+        accessCodeHash: share2.accessCodeHash,
+        status: share2.revokedAt ? "revoked" : share2.expiresAt <= now ? "expired" : "active",
+        expiresAt: String(share2.expiresAt),
+        revokedAt: share2.revokedAt ? String(share2.revokedAt) : null,
+        createdAt: String(share2.createdAt),
+        updatedAt: String(share2.createdAt),
+        publicUrl
+      },
+      rawToken,
+      rawAccessCode
+    };
+  }
+  async createShareForOwner(input) {
+    const created = await this.createShare(input);
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+    if (!vaultItem) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    return {
+      ...this.toOwnerMetadataView(created.share, vaultItem, input.now ?? Date.now(), created.share.publicUrl),
+      rawToken: created.rawToken,
+      rawAccessCode: created.rawAccessCode
+    };
+  }
+  async listSharesForOwner(ownerId, now = Date.now()) {
+    const shares = await this.shareRepository.listForOwner(ownerId);
+    const views = [];
+    for (const share2 of shares) {
+      const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share2.vaultItemId, ownerId);
+      if (!vaultItem) {
+        continue;
+      }
+      views.push(this.toOwnerMetadataView(share2, vaultItem, now));
+    }
+    return views;
+  }
+  async getShareForOwner(ownerId, shareId, now = Date.now()) {
+    const share2 = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+    if (!share2) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share2.vaultItemId, ownerId);
+    if (!vaultItem) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    return this.toOwnerMetadataView(share2, vaultItem, now);
+  }
+  async revokeShareForOwner(ownerId, shareId, now = Date.now()) {
+    const share2 = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+    if (!share2) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share2.vaultItemId, ownerId);
+    if (!vaultItem) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
+    if (!revoked) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const revokedShare = {
+      ...share2,
+      revokedAt: now
+    };
+    return this.toOwnerMetadataView(revokedShare, vaultItem, now);
+  }
+  async revokeShare(ownerId, shareId, now = Date.now()) {
+    const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
+    if (!revoked) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId,
+      eventType: "revoked",
+      actorType: "owner",
+      eventAt: now,
+      ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({ revokedAt: now })
+    });
+  }
+  async resolveShareAccess(input) {
+    const now = input.now ?? Date.now();
+    const pepper = getShareSecretPepper(this.env);
+    const publicHeaders = getSharePublicHeaders();
+    const tokenHash = await hashShareSecret(pepper, "share-token", input.token);
+    const share2 = await this.shareRepository.findByTokenHash(tokenHash);
+    if (!share2) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
+    if (share2.revokedAt !== null && share2.revokedAt !== void 0) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
+    if (share2.expiresAt <= now) {
+      await this.shareRepository.insertAuditEvent({
+        id: createId("share-audit"),
+        shareId: share2.id,
+        eventType: "expired",
+        actorType: "system",
+        eventAt: now,
+        ownerId: share2.ownerId,
+        ipHash: null,
+        userAgentHash: null,
+        metadata: toMetadata({
+          expiredAt: now,
+          expiresAt: share2.expiresAt,
+          status: "expired"
+        })
+      });
+      return { accessible: false, status: "expired", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share2.vaultItemId, share2.ownerId);
+    if (!vaultItem) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
+    const decryptedSecret = await decryptField(vaultItem.secret, this.env.ENCRYPTION_KEY || this.env.JWT_SECRET || "");
+    const period = Number(vaultItem.period || 30);
+    const remainingSeconds = period - Math.floor(now / 1e3) % period;
+    const itemView = {
+      service: vaultItem.service,
+      account: vaultItem.account,
+      ...typeof decryptedSecret === "string" && decryptedSecret ? {
+        otp: {
+          code: await generate(
+            decryptedSecret,
+            period,
+            Number(vaultItem.digits || 6),
+            vaultItem.algorithm || "SHA1",
+            vaultItem.type || "totp",
+            now
+          ),
+          period,
+          remainingSeconds
+        }
+      } : {}
+    };
+    const accessCode = input.accessCode || "";
+    const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share2.accessCodeHash);
+    if (!accessCodeOk) {
+      return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
+    }
+    await this.shareRepository.markAccessed(share2.id, now);
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId: share2.id,
+      eventType: "access_granted",
+      actorType: "recipient",
+      eventAt: now,
+      ownerId: share2.ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({
+        accessedAt: now,
+        status: "active"
+      })
+    });
+    return {
+      accessible: true,
+      status: "active",
+      share: null,
+      itemView,
+      publicHeaders
+    };
+  }
+};
+function createShareService(env, db = env.DB) {
+  const vaultRepository = new VaultRepository(db);
+  const shareRepository = new ShareRepository(db);
+  return new ShareService(env, vaultRepository, shareRepository);
+}
+
+// ../src/shared/middleware/shareRateLimitMiddleware.ts
+init_logger();
+function createId2(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+function toMetadata2(value) {
+  return JSON.stringify(value);
+}
+function returnShareInaccessible(c) {
+  for (const [name, value] of Object.entries(getSharePublicHeaders())) {
+    c.header(name, value);
+  }
+  return c.json({ success: false, message: "share_inaccessible", data: null }, 404);
+}
+var shareRateLimit = (options) => {
+  return async (c, next) => {
+    const db = c.env.DB;
+    if (!db) {
+      logger.warn("[ShareRateLimit] access blocked");
+      return returnShareInaccessible(c);
+    }
+    try {
+      const rawToken = c.req.param("token") || "";
+      const pepper = getShareSecretPepper(c.env);
+      const tokenHash = rawToken ? await hashShareSecret(pepper, "share-token", rawToken) : "missing-token";
+      const key = options?.keyBuilder ? options.keyBuilder(c) : [
+        "share",
+        c.req.header("CF-Connecting-IP") || "unknown",
+        "share-public-access",
+        tokenHash
+      ].filter(Boolean).join(":");
+      const repository = new ShareRepository(db);
+      const decision = await repository.enforceRateLimit({
+        key,
+        shareId: tokenHash,
+        windowMs: SHARE_RATE_LIMIT_WINDOW_MS,
+        maxAttempts: SHARE_RATE_LIMIT_MAX_ATTEMPTS,
+        lockMs: SHARE_RATE_LIMIT_LOCK_MS
+      });
+      if (!decision.allowed) {
+        const share2 = await repository.findByTokenHash(tokenHash);
+        if (share2) {
+          await repository.insertAuditEvent({
+            id: createId2("share-audit"),
+            shareId: share2.id,
+            eventType: "access_denied_threshold",
+            actorType: "recipient",
+            eventAt: Date.now(),
+            ownerId: share2.ownerId,
+            ipHash: null,
+            userAgentHash: null,
+            metadata: toMetadata2({
+              attempts: decision.attempts,
+              lockedUntil: decision.lockedUntil ?? null,
+              windowMs: SHARE_RATE_LIMIT_WINDOW_MS
+            })
+          });
+        }
+        logger.warn("[ShareRateLimit] access blocked");
+        return returnShareInaccessible(c);
+      }
+    } catch {
+      logger.warn("[ShareRateLimit] access blocked");
+      return returnShareInaccessible(c);
+    }
+    await next();
+  };
+};
+
+// ../src/features/share/shareRoutes.ts
+var share = new Hono6();
+var getService3 = (c) => createShareService(c.env);
+share.post("/", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const ownerId = user.email || user.id;
+  const body = await c.req.json().catch(() => ({}));
+  if (typeof body.vaultItemId !== "string" || body.vaultItemId.trim() === "") {
+    return c.json({ success: false, error: "vaultItemId is required" }, 400);
+  }
+  const publicOrigin = c.env.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+  const service = getService3(c);
+  const share2 = await service.createShareForOwner({
+    ownerId,
+    vaultItemId: body.vaultItemId,
+    ttlSeconds: typeof body.ttlSeconds === "number" ? body.ttlSeconds : void 0,
+    expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : void 0,
+    publicOrigin
+  });
+  return c.json({ success: true, share: share2 });
+});
+share.get("/", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const ownerId = user.email || user.id;
+  const service = getService3(c);
+  const shares = await service.listSharesForOwner(ownerId);
+  return c.json({ success: true, shares });
+});
+share.get("/:id", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const ownerId = user.email || user.id;
+  const service = getService3(c);
+  const share2 = await service.getShareForOwner(ownerId, c.req.param("id"));
+  return c.json({ success: true, share: share2 });
+});
+share.delete("/:id", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const ownerId = user.email || user.id;
+  const service = getService3(c);
+  const share2 = await service.revokeShareForOwner(ownerId, c.req.param("id"));
+  return c.json({ success: true, share: share2, message: "Share link revoked" });
+});
+share.post("/public/:token/access", shareRateLimit(), async (c) => {
+  const token = c.req.param("token");
+  const body = await c.req.json().catch(() => ({}));
+  const accessCode = typeof body.accessCode === "string" ? body.accessCode : void 0;
+  const service = getService3(c);
+  const decision = await service.resolveShareAccess({
+    token,
+    accessCode,
+    requestOrigin: new URL(c.req.url).origin
+  });
+  for (const [name, value] of Object.entries(decision.publicHeaders || getSharePublicHeaders())) {
+    c.header(name, value);
+  }
+  if (!decision.accessible) {
+    return c.json({ success: false, message: "share_inaccessible", data: null }, 404);
+  }
+  return c.json({ success: true, data: decision.itemView });
+});
+var shareRoutes_default = share;
+
+// ../src/features/health/healthRoutes.ts
+import { Hono as Hono7 } from "hono";
 
 // ../src/shared/utils/health.ts
 var normalizeDomain = (domain) => {
@@ -7442,7 +8022,7 @@ var runHealthCheck = async (env, requestUrl) => {
 };
 
 // ../src/features/health/healthRoutes.ts
-var health = new Hono6();
+var health = new Hono7();
 health.get("/health-check", async (c) => {
   c.header("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
   c.header("Pragma", "no-cache");
@@ -7457,8 +8037,8 @@ var healthRoutes_default = health;
 
 // ../src/features/emergency/emergencyRoutes.ts
 init_config();
-import { Hono as Hono7 } from "hono";
-var emergency = new Hono7();
+import { Hono as Hono8 } from "hono";
+var emergency = new Hono8();
 emergency.post("/confirm", authMiddleware, rateLimit({
   windowMs: SECURITY_CONFIG.LOCKOUT_TIME,
   max: SECURITY_CONFIG.MAX_LOGIN_ATTEMPTS
@@ -7481,8 +8061,8 @@ var emergencyRoutes_default = emergency;
 
 // ../src/features/auth/wcProxyRoutes.ts
 init_config();
-import { Hono as Hono8 } from "hono";
-var wcProxy = new Hono8();
+import { Hono as Hono9 } from "hono";
+var wcProxy = new Hono9();
 var proxyRequest = async (targetHost, targetPath, c) => {
   const url = new URL(c.req.url);
   url.hostname = targetHost;
@@ -7536,418 +8116,6 @@ wcProxy.all("/explorer/*", (c) => {
 });
 var wcProxyRoutes_default = wcProxy;
 
-// ../src/features/share/shareService.ts
-init_config();
-
-// ../src/shared/db/repositories/shareRepository.ts
-import { and as and5, eq as eq10, isNull as isNull2, sql as sql2 } from "drizzle-orm";
-var ShareRepository = class {
-  constructor(db) {
-    this.db = db;
-  }
-  async createShareLink(input) {
-    await this.db.insert(shareLinks4).values(input);
-    return await this.findByIdForOwner(input.id, input.ownerId);
-  }
-  async findByTokenHash(tokenHash) {
-    const result = await this.db.select().from(shareLinks4).where(eq10(shareLinks4.tokenHash, tokenHash)).limit(1);
-    return result[0] || null;
-  }
-  async findByIdForOwner(id, ownerId) {
-    const result = await this.db.select().from(shareLinks4).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId))).limit(1);
-    return result[0] || null;
-  }
-  async revokeForOwner(id, ownerId, revokedAt) {
-    const existing = await this.findByIdForOwner(id, ownerId);
-    if (!existing || existing.revokedAt !== null && existing.revokedAt !== void 0) {
-      return false;
-    }
-    await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
-    return true;
-  }
-  async markAccessed(id, accessedAt) {
-    await this.db.update(shareLinks4).set({
-      lastAccessedAt: accessedAt,
-      accessCount: sql2`coalesce(${shareLinks4.accessCount}, 0) + 1`
-    }).where(eq10(shareLinks4.id, id));
-  }
-  async insertAuditEvent(input) {
-    await this.db.insert(shareAuditEvents4).values(input);
-  }
-  async enforceRateLimit(input) {
-    const now = input.now ?? Date.now();
-    const existing = await this.db.select().from(shareRateLimits4).where(eq10(shareRateLimits4.key, input.key)).limit(1);
-    const current = existing[0];
-    if (!current) {
-      await this.db.insert(shareRateLimits4).values({
-        key: input.key,
-        shareId: input.shareId,
-        attempts: 1,
-        windowStartedAt: now,
-        lastAttemptAt: now,
-        lockedUntil: null
-      });
-      return { allowed: true, attempts: 1, lockedUntil: null };
-    }
-    if (current.lockedUntil && current.lockedUntil > now) {
-      return { allowed: false, attempts: current.attempts || 0, lockedUntil: current.lockedUntil };
-    }
-    const windowExpired = now - current.windowStartedAt >= input.windowMs;
-    const attempts = windowExpired ? 1 : (current.attempts || 0) + 1;
-    const lockedUntil = attempts > input.maxAttempts ? now + input.lockMs : null;
-    await this.db.update(shareRateLimits4).set({
-      shareId: input.shareId,
-      attempts,
-      windowStartedAt: windowExpired ? now : current.windowStartedAt,
-      lastAttemptAt: now,
-      lockedUntil
-    }).where(eq10(shareRateLimits4.key, input.key));
-    return {
-      allowed: lockedUntil === null,
-      attempts,
-      lockedUntil
-    };
-  }
-};
-
-// ../src/features/share/shareSecurity.ts
-init_config();
-
-// ../src/features/share/shareTypes.ts
-var SHARE_TOKEN_BYTES = 32;
-var SHARE_ACCESS_CODE_BYTES = 16;
-var SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-var SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
-var SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
-var SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
-var SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1e3;
-
-// ../src/features/share/shareSecurity.ts
-var textEncoder = new TextEncoder();
-function encodeBase64Url(bytes) {
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-}
-function constantTimeEqual(left, right) {
-  const leftBytes = textEncoder.encode(left);
-  const rightBytes = textEncoder.encode(right);
-  const maxLength = Math.max(leftBytes.length, rightBytes.length);
-  let mismatch = leftBytes.length ^ rightBytes.length;
-  for (let index = 0; index < maxLength; index += 1) {
-    const leftByte = leftBytes[index] ?? 0;
-    const rightByte = rightBytes[index] ?? 0;
-    mismatch |= leftByte ^ rightByte;
-  }
-  return mismatch === 0;
-}
-function getRandomBytes(byteLength) {
-  const bytes = new Uint8Array(byteLength);
-  crypto.getRandomValues(bytes);
-  return bytes;
-}
-function generateShareToken() {
-  return encodeBase64Url(getRandomBytes(SHARE_TOKEN_BYTES));
-}
-function generateAccessCode() {
-  return encodeBase64Url(getRandomBytes(SHARE_ACCESS_CODE_BYTES));
-}
-async function hashShareSecret(pepper, purpose, value) {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    textEncoder.encode(pepper),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    textEncoder.encode(`${purpose}:${value}`)
-  );
-  return encodeBase64Url(new Uint8Array(signature));
-}
-async function verifyShareSecret(pepper, purpose, value, hash) {
-  const expectedHash = await hashShareSecret(pepper, purpose, value);
-  return constantTimeEqual(expectedHash, hash);
-}
-function buildShareUrl(publicOrigin, token) {
-  const origin = normalizePublicOrigin(publicOrigin);
-  return new URL(`/share/${token}`, origin).toString();
-}
-function normalizePublicOrigin(publicOrigin) {
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(publicOrigin);
-  } catch {
-    throw new AppError("invalid_public_origin", 500);
-  }
-  const isHttps = parsedUrl.protocol === "https:";
-  const isLocalHttp = parsedUrl.protocol === "http:" && (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1" || parsedUrl.hostname === "[::1]" || parsedUrl.hostname === "::1");
-  if (!isHttps && !isLocalHttp) {
-    throw new AppError("invalid_public_origin", 500);
-  }
-  return parsedUrl.origin;
-}
-function getSharePublicHeaders() {
-  return {
-    "Cache-Control": "no-store",
-    Pragma: "no-cache",
-    "Referrer-Policy": "no-referrer"
-  };
-}
-function getShareSecretPepper(env) {
-  if (env.SHARE_SECRET_PEPPER) {
-    return env.SHARE_SECRET_PEPPER;
-  }
-  if (env.JWT_SECRET) {
-    return env.JWT_SECRET;
-  }
-  throw new AppError("missing_share_secret_pepper", 500);
-}
-function clampShareTtlSeconds(ttlSeconds) {
-  if (!Number.isFinite(ttlSeconds)) {
-    return SHARE_DEFAULT_TTL_SECONDS;
-  }
-  const normalized = Math.max(1, Math.floor(ttlSeconds));
-  return Math.min(normalized, SHARE_MAX_TTL_SECONDS);
-}
-
-// ../src/features/share/shareService.ts
-var textEncoder2 = new TextEncoder();
-function createId(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-function toMetadata(value) {
-  return JSON.stringify(value);
-}
-var ShareService = class {
-  constructor(env, vaultRepository, shareRepository) {
-    this.env = env;
-    this.vaultRepository = vaultRepository;
-    this.shareRepository = shareRepository;
-  }
-  async createShare(input) {
-    if (!input.ownerId || !input.vaultItemId) {
-      throw new AppError("share_item_inaccessible", 404);
-    }
-    const now = input.now ?? Date.now();
-    const ttlSeconds = clampShareTtlSeconds(input.ttlSeconds ?? SHARE_DEFAULT_TTL_SECONDS);
-    const expiresAt = input.expiresAt ?? now + ttlSeconds * 1e3;
-    if (expiresAt <= now || expiresAt > now + SHARE_MAX_TTL_SECONDS * 1e3) {
-      throw new AppError("share_item_inaccessible", 404);
-    }
-    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
-    if (!vaultItem) {
-      throw new AppError("share_item_inaccessible", 404);
-    }
-    const rawToken = generateShareToken();
-    const rawAccessCode = generateAccessCode();
-    const pepper = getShareSecretPepper(this.env);
-    const tokenHash = await hashShareSecret(pepper, "share-token", rawToken);
-    const accessCodeHash = await hashShareSecret(pepper, "share-access-code", rawAccessCode);
-    const shareId = createId("share");
-    const share = await this.shareRepository.createShareLink({
-      id: shareId,
-      vaultItemId: input.vaultItemId,
-      ownerId: input.ownerId,
-      tokenHash,
-      accessCodeHash,
-      expiresAt,
-      revokedAt: null,
-      createdAt: now,
-      lastAccessedAt: null,
-      accessCount: 0
-    });
-    const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
-    const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : void 0;
-    await this.shareRepository.insertAuditEvent({
-      id: createId("share-audit"),
-      shareId: share.id,
-      eventType: "created",
-      actorType: "owner",
-      eventAt: now,
-      ownerId: input.ownerId,
-      ipHash: null,
-      userAgentHash: null,
-      metadata: toMetadata({
-        vaultItemId: input.vaultItemId,
-        expiresAt
-      })
-    });
-    return {
-      share: {
-        id: share.id,
-        ownerId: share.ownerId,
-        vaultItemId: share.vaultItemId,
-        tokenHash: share.tokenHash,
-        accessCodeHash: share.accessCodeHash,
-        status: share.revokedAt ? "revoked" : share.expiresAt <= now ? "expired" : "active",
-        expiresAt: String(share.expiresAt),
-        revokedAt: share.revokedAt ? String(share.revokedAt) : null,
-        createdAt: String(share.createdAt),
-        updatedAt: String(share.createdAt),
-        publicUrl
-      },
-      rawToken,
-      rawAccessCode
-    };
-  }
-  async revokeShare(ownerId, shareId, now = Date.now()) {
-    const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
-    if (!revoked) {
-      throw new AppError("share_item_inaccessible", 404);
-    }
-    await this.shareRepository.insertAuditEvent({
-      id: createId("share-audit"),
-      shareId,
-      eventType: "revoked",
-      actorType: "owner",
-      eventAt: now,
-      ownerId,
-      ipHash: null,
-      userAgentHash: null,
-      metadata: toMetadata({ revokedAt: now })
-    });
-  }
-  async resolveShareAccess(input) {
-    const now = input.now ?? Date.now();
-    const pepper = getShareSecretPepper(this.env);
-    const publicHeaders = getSharePublicHeaders();
-    const tokenHash = await hashShareSecret(pepper, "share-token", input.token);
-    const share = await this.shareRepository.findByTokenHash(tokenHash);
-    if (!share) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
-    if (share.revokedAt !== null && share.revokedAt !== void 0) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
-    if (share.expiresAt <= now) {
-      await this.shareRepository.insertAuditEvent({
-        id: createId("share-audit"),
-        shareId: share.id,
-        eventType: "expired",
-        actorType: "system",
-        eventAt: now,
-        ownerId: share.ownerId,
-        ipHash: null,
-        userAgentHash: null,
-        metadata: toMetadata({
-          expiredAt: now,
-          expiresAt: share.expiresAt,
-          status: "expired"
-        })
-      });
-      return { accessible: false, status: "expired", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
-    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId);
-    if (!vaultItem) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
-    const accessCode = input.accessCode || "";
-    const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share.accessCodeHash);
-    if (!accessCodeOk) {
-      return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
-    }
-    await this.shareRepository.markAccessed(share.id, now);
-    await this.shareRepository.insertAuditEvent({
-      id: createId("share-audit"),
-      shareId: share.id,
-      eventType: "access_granted",
-      actorType: "recipient",
-      eventAt: now,
-      ownerId: share.ownerId,
-      ipHash: null,
-      userAgentHash: null,
-      metadata: toMetadata({
-        accessedAt: now,
-        status: "active"
-      })
-    });
-    return {
-      accessible: true,
-      status: "active",
-      share: null,
-      itemView: {
-        service: vaultItem.service,
-        account: vaultItem.account
-      },
-      publicHeaders
-    };
-  }
-};
-function createShareService(env, db = env.DB) {
-  const vaultRepository = new VaultRepository(db);
-  const shareRepository = new ShareRepository(db);
-  return new ShareService(env, vaultRepository, shareRepository);
-}
-
-// ../src/shared/middleware/shareRateLimitMiddleware.ts
-init_config();
-init_logger();
-function createId2(prefix) {
-  return `${prefix}-${crypto.randomUUID()}`;
-}
-function toMetadata2(value) {
-  return JSON.stringify(value);
-}
-var shareRateLimit = (options) => {
-  return async (c, next) => {
-    const db = c.env.DB;
-    if (!db) {
-      logger.warn("[ShareRateLimit] access blocked");
-      throw new AppError("share_inaccessible", 404);
-    }
-    try {
-      const rawToken = c.req.param("token") || "";
-      const pepper = getShareSecretPepper(c.env);
-      const tokenHash = rawToken ? await hashShareSecret(pepper, "share-token", rawToken) : "missing-token";
-      const key = options?.keyBuilder ? options.keyBuilder(c) : [
-        "share",
-        c.req.header("CF-Connecting-IP") || "unknown",
-        "share-public-access",
-        tokenHash
-      ].filter(Boolean).join(":");
-      const repository = new ShareRepository(db);
-      const decision = await repository.enforceRateLimit({
-        key,
-        shareId: tokenHash,
-        windowMs: SHARE_RATE_LIMIT_WINDOW_MS,
-        maxAttempts: SHARE_RATE_LIMIT_MAX_ATTEMPTS,
-        lockMs: SHARE_RATE_LIMIT_LOCK_MS
-      });
-      if (!decision.allowed) {
-        const share = await repository.findByTokenHash(tokenHash);
-        if (share) {
-          await repository.insertAuditEvent({
-            id: createId2("share-audit"),
-            shareId: share.id,
-            eventType: "access_denied_threshold",
-            actorType: "recipient",
-            eventAt: Date.now(),
-            ownerId: share.ownerId,
-            ipHash: null,
-            userAgentHash: null,
-            metadata: toMetadata2({
-              attempts: decision.attempts,
-              lockedUntil: decision.lockedUntil ?? null,
-              windowMs: SHARE_RATE_LIMIT_WINDOW_MS
-            })
-          });
-        }
-        logger.warn("[ShareRateLimit] access blocked");
-        throw new AppError("share_inaccessible", 404);
-      }
-    } catch {
-      logger.warn("[ShareRateLimit] access blocked");
-      throw new AppError("share_inaccessible", 404);
-    }
-    await next();
-  };
-};
-
 // ../src/features/share/sharePrimitives.ts
 var SHARE_PRIMITIVES = {
   ShareService,
@@ -7956,15 +8124,21 @@ var SHARE_PRIMITIVES = {
 };
 
 // ../src/app/index.ts
-var app = new Hono9();
+var app = new Hono10();
 app.__sharePrimitives = SHARE_PRIMITIVES;
+function redactSharePublicToken(value) {
+  return value.replace(
+    /\/api\/share\/public\/[^\s/?#]+\/access/g,
+    "/api/share/public/[share-token]/access"
+  );
+}
 app.use("*", async (c, next) => {
   if (c.env) {
     await initializeEnv(c.env);
   }
   await next();
 });
-app.use("*", hLogger((str) => logger.info(str)));
+app.use("*", hLogger((str) => logger.info(redactSharePublicToken(str))));
 app.use("/api/*", cors({
   origin: (origin) => origin,
   credentials: true,
@@ -8008,6 +8182,7 @@ app.route("/api/vault", vaultRoutes_default);
 app.route("/api/backups", backupRoutes_default);
 app.route("/api/telegram", telegramRoutes_default);
 app.route("/api/tools", toolsRoutes_default);
+app.route("/api/share", shareRoutes_default);
 app.route("/api/oauth/wc-proxy", wcProxyRoutes_default);
 app.all("/api/*", (c) => {
   return c.json({ success: false, error: "API Not Found" }, 404);
