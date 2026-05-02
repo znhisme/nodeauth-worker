@@ -19,6 +19,40 @@ export const vault = pgTable('vault', {
     deletedAt: bigint('deleted_at', { mode: 'number' }),
 });
 
+export const shareLinks = pgTable('share_links', {
+    id: varchar('id').primaryKey(),
+    vaultItemId: varchar('vault_item_id').notNull(),
+    ownerId: varchar('owner_id').notNull(),
+    tokenHash: varchar('token_hash').notNull(),
+    accessCodeHash: varchar('access_code_hash').notNull(),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    revokedAt: bigint('revoked_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    lastAccessedAt: bigint('last_accessed_at', { mode: 'number' }),
+    accessCount: bigint('access_count', { mode: 'number' }).notNull().default(0),
+});
+
+export const shareAuditEvents = pgTable('share_audit_events', {
+    id: varchar('id').primaryKey(),
+    shareId: varchar('share_id').notNull(),
+    eventType: varchar('event_type').notNull(),
+    actorType: varchar('actor_type').notNull(),
+    eventAt: bigint('event_at', { mode: 'number' }).notNull(),
+    ownerId: varchar('owner_id').notNull(),
+    ipHash: varchar('ip_hash'),
+    userAgentHash: varchar('user_agent_hash'),
+    metadata: text('metadata'),
+});
+
+export const shareRateLimits = pgTable('share_rate_limits', {
+    key: varchar('key').primaryKey(),
+    shareId: varchar('share_id').notNull(),
+    attempts: bigint('attempts', { mode: 'number' }).notNull().default(0),
+    windowStartedAt: bigint('window_started_at', { mode: 'number' }).notNull(),
+    lastAttemptAt: bigint('last_attempt_at', { mode: 'number' }).notNull(),
+    lockedUntil: bigint('locked_until', { mode: 'number' }),
+});
+
 export const backupProviders = pgTable('backup_providers', {
     id: serial('id').primaryKey(),
     type: varchar('type').notNull(),

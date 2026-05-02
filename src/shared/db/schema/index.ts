@@ -16,6 +16,9 @@ export let backupEmailHistory: typeof sqliteSchema.backupEmailHistory;
 export let authPasskeys: typeof sqliteSchema.authPasskeys;
 export let authSessions: typeof sqliteSchema.authSessions;
 export let rateLimits: typeof sqliteSchema.rateLimits;
+export let shareLinks: typeof sqliteSchema.shareLinks;
+export let shareAuditEvents: typeof sqliteSchema.shareAuditEvents;
+export let shareRateLimits: typeof sqliteSchema.shareRateLimits;
 export let schemaMetadata: typeof sqliteSchema.schemaMetadata;
 
 if (engine === 'mysql') {
@@ -26,6 +29,9 @@ if (engine === 'mysql') {
     authPasskeys = mysqlSchema.authPasskeys as any;
     authSessions = mysqlSchema.authSessions as any;
     rateLimits = mysqlSchema.rateLimits as any;
+    shareLinks = mysqlSchema.shareLinks as any;
+    shareAuditEvents = mysqlSchema.shareAuditEvents as any;
+    shareRateLimits = mysqlSchema.shareRateLimits as any;
     schemaMetadata = mysqlSchema.schemaMetadata as any;
 } else if (engine === 'postgres' || engine === 'postgresql') {
     vault = pgSchema.vault as any;
@@ -35,6 +41,9 @@ if (engine === 'mysql') {
     authPasskeys = pgSchema.authPasskeys as any;
     authSessions = pgSchema.authSessions as any;
     rateLimits = pgSchema.rateLimits as any;
+    shareLinks = pgSchema.shareLinks as any;
+    shareAuditEvents = pgSchema.shareAuditEvents as any;
+    shareRateLimits = pgSchema.shareRateLimits as any;
     schemaMetadata = pgSchema.schemaMetadata as any;
 } else {
     vault = sqliteSchema.vault;
@@ -44,6 +53,9 @@ if (engine === 'mysql') {
     authPasskeys = sqliteSchema.authPasskeys;
     authSessions = sqliteSchema.authSessions;
     rateLimits = sqliteSchema.rateLimits;
+    shareLinks = sqliteSchema.shareLinks;
+    shareAuditEvents = sqliteSchema.shareAuditEvents;
+    shareRateLimits = sqliteSchema.shareRateLimits;
     schemaMetadata = sqliteSchema.schemaMetadata;
 }
 
@@ -58,6 +70,12 @@ export type BackupEmailHistory = typeof sqliteSchema.backupEmailHistory.$inferSe
 export type NewBackupEmailHistory = typeof sqliteSchema.backupEmailHistory.$inferInsert;
 export type RateLimit = typeof sqliteSchema.rateLimits.$inferSelect;
 export type NewRateLimit = typeof sqliteSchema.rateLimits.$inferInsert;
+export type ShareLink = typeof sqliteSchema.shareLinks.$inferSelect;
+export type NewShareLink = typeof sqliteSchema.shareLinks.$inferInsert;
+export type ShareAuditEvent = typeof sqliteSchema.shareAuditEvents.$inferSelect;
+export type NewShareAuditEvent = typeof sqliteSchema.shareAuditEvents.$inferInsert;
+export type ShareRateLimit = typeof sqliteSchema.shareRateLimits.$inferSelect;
+export type NewShareRateLimit = typeof sqliteSchema.shareRateLimits.$inferInsert;
 export type SchemaMetadata = typeof sqliteSchema.schemaMetadata.$inferSelect;
 export type NewSchemaMetadata = typeof sqliteSchema.schemaMetadata.$inferInsert;
 export type AuthSession = typeof sqliteSchema.authSessions.$inferSelect;

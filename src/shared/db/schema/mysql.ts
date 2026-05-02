@@ -19,6 +19,40 @@ export const vault = mysqlTable('vault', {
     deletedAt: bigint('deleted_at', { mode: 'number' }),
 });
 
+export const shareLinks = mysqlTable('share_links', {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    vaultItemId: varchar('vault_item_id', { length: 36 }).notNull(),
+    ownerId: varchar('owner_id', { length: 255 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 255 }).notNull(),
+    accessCodeHash: varchar('access_code_hash', { length: 255 }).notNull(),
+    expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
+    revokedAt: bigint('revoked_at', { mode: 'number' }),
+    createdAt: bigint('created_at', { mode: 'number' }).notNull(),
+    lastAccessedAt: bigint('last_accessed_at', { mode: 'number' }),
+    accessCount: bigint('access_count', { mode: 'number' }).notNull().default(0),
+});
+
+export const shareAuditEvents = mysqlTable('share_audit_events', {
+    id: varchar('id', { length: 36 }).primaryKey(),
+    shareId: varchar('share_id', { length: 36 }).notNull(),
+    eventType: varchar('event_type', { length: 50 }).notNull(),
+    actorType: varchar('actor_type', { length: 50 }).notNull(),
+    eventAt: bigint('event_at', { mode: 'number' }).notNull(),
+    ownerId: varchar('owner_id', { length: 255 }).notNull(),
+    ipHash: varchar('ip_hash', { length: 255 }),
+    userAgentHash: varchar('user_agent_hash', { length: 255 }),
+    metadata: longtext('metadata'),
+});
+
+export const shareRateLimits = mysqlTable('share_rate_limits', {
+    key: varchar('key', { length: 255 }).primaryKey(),
+    shareId: varchar('share_id', { length: 36 }).notNull(),
+    attempts: bigint('attempts', { mode: 'number' }).notNull().default(0),
+    windowStartedAt: bigint('window_started_at', { mode: 'number' }).notNull(),
+    lastAttemptAt: bigint('last_attempt_at', { mode: 'number' }).notNull(),
+    lockedUntil: bigint('locked_until', { mode: 'number' }),
+});
+
 export const backupProviders = mysqlTable('backup_providers', {
     id: int('id').primaryKey().autoincrement(),
     type: varchar('type', { length: 50 }).notNull(),

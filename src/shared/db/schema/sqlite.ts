@@ -22,6 +22,40 @@ export const vault = sqliteTable('vault', {
   deletedAt: integer('deleted_at'),
 });
 
+export const shareLinks = sqliteTable('share_links', {
+  id: text('id').primaryKey(),
+  vaultItemId: text('vault_item_id').notNull(),
+  ownerId: text('owner_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  accessCodeHash: text('access_code_hash').notNull(),
+  expiresAt: integer('expires_at').notNull(),
+  revokedAt: integer('revoked_at'),
+  createdAt: integer('created_at').notNull(),
+  lastAccessedAt: integer('last_accessed_at'),
+  accessCount: integer('access_count').notNull().default(0),
+});
+
+export const shareAuditEvents = sqliteTable('share_audit_events', {
+  id: text('id').primaryKey(),
+  shareId: text('share_id').notNull(),
+  eventType: text('event_type').notNull(),
+  actorType: text('actor_type').notNull(),
+  eventAt: integer('event_at').notNull(),
+  ownerId: text('owner_id').notNull(),
+  ipHash: text('ip_hash'),
+  userAgentHash: text('user_agent_hash'),
+  metadata: text('metadata'),
+});
+
+export const shareRateLimits = sqliteTable('share_rate_limits', {
+  key: text('key').primaryKey(),
+  shareId: text('share_id').notNull(),
+  attempts: integer('attempts').notNull().default(0),
+  windowStartedAt: integer('window_started_at').notNull(),
+  lastAttemptAt: integer('last_attempt_at').notNull(),
+  lockedUntil: integer('locked_until'),
+});
+
 // 2. 备份提供商表 (Backup Providers)
 export const backupProviders = sqliteTable('backup_providers', {
   id: integer('id').primaryKey({ autoIncrement: true }),

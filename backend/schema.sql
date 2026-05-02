@@ -75,6 +75,47 @@ CREATE TABLE IF NOT EXISTS rate_limits (
     expires_at INTEGER           -- 锁定过期时间 (如果有)
 );
 
+CREATE TABLE IF NOT EXISTS share_links (
+    id TEXT PRIMARY KEY,
+    vault_item_id TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    token_hash TEXT NOT NULL,
+    access_code_hash TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    revoked_at INTEGER,
+    created_at INTEGER NOT NULL,
+    last_accessed_at INTEGER,
+    access_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS share_audit_events (
+    id TEXT PRIMARY KEY,
+    share_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    actor_type TEXT NOT NULL,
+    event_at INTEGER NOT NULL,
+    owner_id TEXT NOT NULL,
+    ip_hash TEXT,
+    user_agent_hash TEXT,
+    metadata TEXT
+);
+
+CREATE TABLE IF NOT EXISTS share_rate_limits (
+    key TEXT PRIMARY KEY,
+    share_id TEXT NOT NULL,
+    attempts INTEGER DEFAULT 0,
+    window_started_at INTEGER NOT NULL,
+    last_attempt_at INTEGER NOT NULL,
+    locked_until INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_share_links_vault_item ON share_links(vault_item_id);
+CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
+CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
+CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+
 -- 设备会话表 (Auth Sessions)
 CREATE TABLE IF NOT EXISTS auth_sessions (
     id TEXT PRIMARY KEY,             -- Session UUID
