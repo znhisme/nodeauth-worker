@@ -20,3 +20,27 @@ All commands exited `0` on 2026-05-02:
 - `backend/schema.sql` includes the D1/SQLite baseline share tables and indexes.
 - Worker, Docker, and Netlify generated backend outputs include share table names plus `share_item_inaccessible` and `share_inaccessible` enforcement signals.
 - Share primitives are intentionally imported by the app bundle through `SHARE_PRIMITIVES` without mounting public share routes before the route phase owns that behavior.
+
+## Manual Database Push Boundary
+
+Phase 1 autonomous validation does not run `npx drizzle-kit push` because no live database credentials or Drizzle config file are present in this checkout.
+
+An operator with configured credentials should run these documented manual command candidates:
+
+- `npm --prefix backend run build:worker`
+- `npm --prefix backend run build:docker`
+- `npm --prefix backend run build:netlify`
+- `npx --prefix backend drizzle-kit push`
+
+## Threats Covered
+
+- raw token leakage
+- access-code guessing
+- fail-open rate limiting
+- deleted/revoked/expired share bypass
+- raw TOTP seed disclosure
+- unsafe logging/audit data
+- cache/referrer leakage
+- cross-owner access
+- generated-bundle drift
+- cross-runtime schema drift
