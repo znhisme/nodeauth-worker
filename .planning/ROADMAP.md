@@ -30,7 +30,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. Expiration, revocation, deleted-item checks, audit events, and fail-closed share-specific rate limiting are enforced in service/repository logic before route behavior depends on them.
 **Plans**: 4 plans
 Plans:
-- [ ] 01-01-PLAN.md — Restore editable backend source, provenance, backend lockfile, and reproducible target build scripts.
+- [x] 01-01-PLAN.md — Restore editable backend source, provenance, backend lockfile, and reproducible target build scripts.
 - [ ] 01-02-PLAN.md — Define share-link security contract, domain types, and token/access-code security primitives.
 - [ ] 01-03-PLAN.md — Add durable share schema, repository/service enforcement, audit, and fail-closed rate limiting.
 - [ ] 01-04-PLAN.md — Run blocking schema/migration/test/build alignment validation across backend targets.
@@ -69,7 +69,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Security Primitives | 0/TBD | Not started | - |
+| 1. Foundation and Security Primitives | 1/4 | In Progress | - |
 | 2. Share Link API | 0/TBD | Not started | - |
 | 3. Cleanup, Compatibility, and Hardening | 0/TBD | Not started | - |
 

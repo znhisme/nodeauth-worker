@@ -9,8 +9,8 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 
 ### Foundation
 
-- [ ] **FND-01**: Maintainer can identify editable backend source, schema source, build scripts, and tests needed to implement share links without hand-patching generated bundles.
-- [ ] **FND-02**: Maintainer can run or document a reproducible backend build path for Cloudflare Worker, Docker, and Netlify outputs before share-link API work begins.
+- [x] **FND-01**: Maintainer can identify editable backend source, schema source, build scripts, and tests needed to implement share links without hand-patching generated bundles.
+- [x] **FND-02**: Maintainer can run or document a reproducible backend build path for Cloudflare Worker, Docker, and Netlify outputs before share-link API work begins.
 - [ ] **FND-03**: Maintainer has a written security contract covering token handling, access-code policy, expiration limits, revocation semantics, TOTP disclosure, logging, cache headers, referrer policy, and canonical public origin.
 
 ### Share State
@@ -45,7 +45,7 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 - [ ] **UX-01**: System can clean up or mark expired shares and stale share rate-limit state through scheduled or opportunistic backend work.
 - [ ] **UX-02**: API contract exposes enough safe status information for a future owner UI to distinguish active, expired, revoked, and accessed links.
 - [ ] **UX-03**: API contract and project notes clearly explain that revocation stops future link access but cannot retract credential data already copied by the recipient.
-- [ ] **UX-04**: If editable frontend source is available, implementation scope identifies the owner and recipient UI surfaces needed for share creation, access-code entry, reveal/copy, and revoke flows; otherwise v1 remains API-only with documented contracts.
+- [x] **UX-04**: If editable frontend source is available, implementation scope identifies the owner and recipient UI surfaces needed for share creation, access-code entry, reveal/copy, and revoke flows; otherwise v1 remains API-only with documented contracts.
 
 ### Compatibility And Hardening
 
@@ -88,8 +88,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FND-01 | Phase 1 | Pending |
-| FND-02 | Phase 1 | Pending |
+| FND-01 | Phase 1 | Complete |
+| FND-02 | Phase 1 | Complete |
 | FND-03 | Phase 1 | Pending |
 | STATE-01 | Phase 1 | Pending |
 | STATE-02 | Phase 1 | Pending |
@@ -112,7 +112,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-01 | Phase 3 | Pending |
 | UX-02 | Phase 2 | Pending |
 | UX-03 | Phase 3 | Pending |
-| UX-04 | Phase 1 | Pending |
+| UX-04 | Phase 1 | Complete |
 | HARD-01 | Phase 3 | Pending |
 | HARD-02 | Phase 3 | Pending |
 | HARD-03 | Phase 3 | Pending |
