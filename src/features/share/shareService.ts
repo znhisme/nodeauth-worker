@@ -265,6 +265,12 @@ export class ShareService {
             return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
+        const accessCode = input.accessCode || '';
+        const accessCodeOk = await verifyShareSecret(pepper, 'share-access-code', accessCode, share.accessCodeHash);
+        if (!accessCodeOk) {
+            return { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
+        }
+
         const decryptedSecret = await decryptField(vaultItem.secret, this.env.ENCRYPTION_KEY || this.env.JWT_SECRET || '');
         const period = Number(vaultItem.period || 30);
         const remainingSeconds = period - (Math.floor(now / 1000) % period);
@@ -286,12 +292,6 @@ export class ShareService {
                 },
             } : {}),
         };
-
-        const accessCode = input.accessCode || '';
-        const accessCodeOk = await verifyShareSecret(pepper, 'share-access-code', accessCode, share.accessCodeHash);
-        if (!accessCodeOk) {
-            return { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
-        }
 
         await this.shareRepository.markAccessed(share.id, now);
         await this.shareRepository.insertAuditEvent({
