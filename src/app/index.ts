@@ -45,6 +45,39 @@ export function redactSharePublicToken(value: string): string {
     );
 }
 
+function normalizeConfiguredOrigin(origin: string | undefined): string | null {
+    const trimmed = origin?.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    try {
+        return new URL(trimmed.replace(/\/+$/, '')).origin;
+    } catch {
+        return null;
+    }
+}
+
+export function resolveApiCorsOrigin(origin: string, env: EnvBindings): string | null {
+    if (!origin) {
+        return null;
+    }
+
+    const trustedOrigin = normalizeConfiguredOrigin(env.NODEAUTH_PUBLIC_ORIGIN);
+    if (!trustedOrigin) {
+        return null;
+    }
+
+    let requestOrigin: string;
+    try {
+        requestOrigin = new URL(origin).origin;
+    } catch {
+        return null;
+    }
+
+    return requestOrigin === trustedOrigin ? requestOrigin : null;
+}
+
 // 1.1 环境拦截与自动化解密 (新特性：支持 aes: 前缀深度解析)
 app.use('*', async (c, next) => {
     // 自动扫描 c.env 并根据 JWT_SECRET 作为根密钥进行环境变量解密
@@ -59,7 +92,7 @@ app.use('*', hLogger((str) => logger.info(redactSharePublicToken(str))));
 
 // 1.3 跨域策略 (CORS)
 app.use('/api/*', cors({
-    origin: (origin) => origin,
+    origin: (origin, c) => resolveApiCorsOrigin(origin, c.env),
     credentials: true,
     allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE'],
