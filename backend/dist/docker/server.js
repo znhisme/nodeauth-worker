@@ -7588,8 +7588,12 @@ var ShareRepository = class {
     return result[0] || null;
   }
   async revokeForOwner(id, ownerId, revokedAt) {
-    const result = await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
-    return !!result;
+    const existing = await this.findByIdForOwner(id, ownerId);
+    if (!existing || existing.revokedAt !== null && existing.revokedAt !== void 0) {
+      return false;
+    }
+    await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
+    return true;
   }
   async markAccessed(id, accessedAt) {
     await this.db.update(shareLinks4).set({
@@ -7717,6 +7721,13 @@ function normalizePublicOrigin(publicOrigin) {
   }
   return parsedUrl.origin;
 }
+function getSharePublicHeaders() {
+  return {
+    "Cache-Control": "no-store",
+    Pragma: "no-cache",
+    "Referrer-Policy": "no-referrer"
+  };
+}
 function getShareSecretPepper(env) {
   if (env.SHARE_SECRET_PEPPER) {
     return env.SHARE_SECRET_PEPPER;
@@ -7834,35 +7845,36 @@ var ShareService = class {
   async resolveShareAccess(input) {
     const now = input.now ?? Date.now();
     const pepper = getShareSecretPepper(this.env);
+    const publicHeaders = getSharePublicHeaders();
     const tokenHash = await hashShareSecret(pepper, "share-token", input.token);
     const share = await this.shareRepository.findByTokenHash(tokenHash);
     if (!share) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null };
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     if (share.revokedAt !== null && share.revokedAt !== void 0) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share, itemView: null };
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     if (share.expiresAt <= now) {
-      return { accessible: false, status: "expired", reason: "inaccessible", share, itemView: null };
+      return { accessible: false, status: "expired", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId);
     if (!vaultItem) {
-      return { accessible: false, status: "revoked", reason: "inaccessible", share, itemView: null };
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     const accessCode = input.accessCode || "";
     const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share.accessCodeHash);
     if (!accessCodeOk) {
-      return { accessible: false, status: "active", reason: "inaccessible", share, itemView: null };
+      return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     return {
       accessible: true,
       status: "active",
-      share,
+      share: null,
       itemView: {
         service: vaultItem.service,
         account: vaultItem.account
       },
-      publicHeaders: void 0,
+      publicHeaders,
       publicUrl: input.requestOrigin ? buildShareUrl(input.requestOrigin, input.token) : void 0
     };
   }
@@ -7883,17 +7895,20 @@ var shareRateLimit = (options) => {
       logger.warn("[ShareRateLimit] access blocked");
       throw new AppError("share_inaccessible", 404);
     }
-    const key = options?.keyBuilder ? options.keyBuilder(c) : [
-      "share",
-      c.req.header("CF-Connecting-IP") || "unknown",
-      c.req.path,
-      c.req.param("token") || ""
-    ].filter(Boolean).join(":");
     try {
+      const rawToken = c.req.param("token") || "";
+      const pepper = getShareSecretPepper(c.env);
+      const tokenHash = rawToken ? await hashShareSecret(pepper, "share-token", rawToken) : "missing-token";
+      const key = options?.keyBuilder ? options.keyBuilder(c) : [
+        "share",
+        c.req.header("CF-Connecting-IP") || "unknown",
+        c.req.path,
+        tokenHash
+      ].filter(Boolean).join(":");
       const repository = new ShareRepository(db2);
       const decision = await repository.enforceRateLimit({
         key,
-        shareId: c.req.param("token") || key,
+        shareId: tokenHash,
         windowMs: SHARE_RATE_LIMIT_WINDOW_MS,
         maxAttempts: SHARE_RATE_LIMIT_MAX_ATTEMPTS,
         lockMs: SHARE_RATE_LIMIT_LOCK_MS
