@@ -53,7 +53,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Add owner-safe share DTOs, owner-scoped repository/service metadata, and recipient OTP SharedItemView generation.
 - [x] 02-02-PLAN.md — Add authenticated owner share APIs and unauthenticated public recipient access endpoint.
-- [ ] 02-03-PLAN.md — Mount `/api/share` in the root app and redact public share tokens from request logs.
+- [x] 02-03-PLAN.md — Mount `/api/share` in the root app and redact public share tokens from request logs.
 - [ ] 02-04-PLAN.md — Regenerate and validate Worker, Docker, and Netlify backend bundles from source.
 **UI hint**: yes
 

@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-05-02T21:35:15.829Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-05-02T21:43:37.249Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 11
-  completed_plans: 9
-  percent: 82
+  completed_plans: 10
+  percent: 91
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 ## Current Position
 
 Phase: 02 (share-link-api) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-05-02
 
-Progress: [████████░░] 82%
+Progress: [█████████░] 91%
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████████░░] 82%
 | Phase 01 P06 | 1min | 2 tasks | 6 files |
 | Phase 01 P07 | 10min | 2 tasks | 4 files |
 | Phase 02-share-link-api P02 | 9min | 2 tasks | 4 files |
+| Phase 02-share-link-api P03 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 01-foundation-and-security-primitives]: Skip threshold-denial audit insertion when a derived token hash does not resolve to a share because audit rows require real owner and share IDs.
 - [Phase 02-share-link-api]: Keep public recipient access unauthenticated but always behind shareRateLimit(). — Public links must be usable without NodeAuth accounts, but brute-force protection remains mandatory.
 - [Phase 02-share-link-api]: Return the same generic public JSON envelope and no-store/no-referrer headers from both route-level inaccessible decisions and middleware-level blocking. — Middleware can block before the route handler, so it must apply the public privacy contract itself.
+- [Phase 02-share-link-api]: Redact /api/share/public/:token/access in the global Hono logger callback instead of exempting share routes from logging. — Request logging remains useful while raw public share URL tokens are masked before logger.info receives Hono log strings.
+- [Phase 02-share-link-api]: Mount /api/share before the generic /api/* fallback and leave share routes inside the existing health gate. — Valid share APIs must be reachable, unknown share API routes should still fall through to the existing 404 handler, and unsafe deployments should continue blocking sensitive share endpoints.
 
 ### Pending Todos
 
@@ -106,6 +109,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-02T21:35:15.820Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-05-02T21:43:17.947Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
