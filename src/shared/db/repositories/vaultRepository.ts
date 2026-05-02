@@ -187,6 +187,25 @@ export class VaultRepository {
     }
 
     /**
+     * 获取 owner 可访问且未删除的单个 item
+     */
+    async findActiveByIdForOwner(id: string, ownerId: string): Promise<VaultItem | null> {
+        const result = await this.db
+            .select()
+            .from(vault)
+            .where(
+                and(
+                    eq(vault.id, id),
+                    isNull(vault.deletedAt),
+                    or(isNull(vault.createdBy), eq(vault.createdBy, ownerId))
+                )
+            )
+            .limit(1);
+
+        return result[0] || null;
+    }
+
+    /**
      * 根据 service/account 查找记录 (大小写不敏感，自动 trim)
      * 只匹配未被软删除的记录
      */
