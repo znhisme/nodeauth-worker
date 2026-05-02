@@ -56,7 +56,7 @@ Plans:
 - [x] 02-03-PLAN.md — Mount `/api/share` in the root app and redact public share tokens from request logs.
 - [x] 02-04-PLAN.md — Regenerate and validate Worker, Docker, and Netlify backend bundles from source.
 - [x] 02-05-PLAN.md — Close source security gaps for credentialed CORS and access-code-first public share access.
-- [ ] 02-06-PLAN.md — Regenerate Worker, Docker, and Netlify backend bundles with the gap fixes.
+- [x] 02-06-PLAN.md — Regenerate Worker, Docker, and Netlify backend bundles with the gap fixes.
 **UI hint**: yes
 
 ### Phase 3: Cleanup, Compatibility, and Hardening
