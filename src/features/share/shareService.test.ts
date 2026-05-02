@@ -255,6 +255,7 @@ describe('ShareService', () => {
         const decision = await service.resolveShareAccess({
             token: rawToken,
             accessCode,
+            requestOrigin: 'https://example.test',
             now: 1000,
         } as any);
 
@@ -268,6 +269,11 @@ describe('ShareService', () => {
         });
         expect(shareRepository.findByTokenHash).toHaveBeenCalledWith(tokenHash);
         expectRecipientSafeDecision(decision);
+        const serializedDecision = JSON.stringify(decision);
+        expect(serializedDecision).not.toContain(rawToken);
+        expect(serializedDecision).not.toContain('https://');
+        expect(serializedDecision).not.toContain('publicUrl');
+        expect(serializedDecision).not.toContain('fullUrl');
         expect(vaultRepository.findActiveByIdForOwner).toHaveBeenCalledWith('vault-1', 'owner-1');
         expect(shareRepository.markAccessed).toHaveBeenCalledWith('share-1', 1000);
         expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({

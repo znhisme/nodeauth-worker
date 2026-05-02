@@ -201,7 +201,6 @@ export class ShareService {
                 account: vaultItem.account,
             },
             publicHeaders,
-            publicUrl: input.requestOrigin ? buildShareUrl(input.requestOrigin, input.token) : undefined,
         };
     }
 }
