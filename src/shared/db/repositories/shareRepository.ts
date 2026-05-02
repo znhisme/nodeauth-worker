@@ -38,12 +38,17 @@ export class ShareRepository {
     }
 
     async revokeForOwner(id: string, ownerId: string, revokedAt: number): Promise<boolean> {
-        const result = await this.db
+        const existing = await this.findByIdForOwner(id, ownerId);
+        if (!existing || (existing.revokedAt !== null && existing.revokedAt !== undefined)) {
+            return false;
+        }
+
+        await this.db
             .update(shareLinks)
             .set({ revokedAt })
             .where(and(eq(shareLinks.id, id), eq(shareLinks.ownerId, ownerId), isNull(shareLinks.revokedAt)));
 
-        return !!result;
+        return true;
     }
 
     async markAccessed(id: string, accessedAt: number): Promise<void> {
