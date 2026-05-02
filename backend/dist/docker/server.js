@@ -7855,6 +7855,21 @@ var ShareService = class {
       return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     if (share.expiresAt <= now) {
+      await this.shareRepository.insertAuditEvent({
+        id: createId("share-audit"),
+        shareId: share.id,
+        eventType: "expired",
+        actorType: "system",
+        eventAt: now,
+        ownerId: share.ownerId,
+        ipHash: null,
+        userAgentHash: null,
+        metadata: toMetadata({
+          expiredAt: now,
+          expiresAt: share.expiresAt,
+          status: "expired"
+        })
+      });
       return { accessible: false, status: "expired", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
     const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId);
@@ -7866,6 +7881,21 @@ var ShareService = class {
     if (!accessCodeOk) {
       return { accessible: false, status: "active", reason: "inaccessible", share: null, itemView: null, publicHeaders };
     }
+    await this.shareRepository.markAccessed(share.id, now);
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId: share.id,
+      eventType: "access_granted",
+      actorType: "recipient",
+      eventAt: now,
+      ownerId: share.ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({
+        accessedAt: now,
+        status: "active"
+      })
+    });
     return {
       accessible: true,
       status: "active",
@@ -7874,8 +7904,7 @@ var ShareService = class {
         service: vaultItem.service,
         account: vaultItem.account
       },
-      publicHeaders,
-      publicUrl: input.requestOrigin ? buildShareUrl(input.requestOrigin, input.token) : void 0
+      publicHeaders
     };
   }
 };
@@ -7888,6 +7917,12 @@ function createShareService(env, db2 = env.DB) {
 // ../src/shared/middleware/shareRateLimitMiddleware.ts
 init_config();
 init_logger();
+function createId2(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+function toMetadata2(value) {
+  return JSON.stringify(value);
+}
 var shareRateLimit = (options) => {
   return async (c, next) => {
     const db2 = c.env.DB;
@@ -7902,7 +7937,7 @@ var shareRateLimit = (options) => {
       const key = options?.keyBuilder ? options.keyBuilder(c) : [
         "share",
         c.req.header("CF-Connecting-IP") || "unknown",
-        c.req.path,
+        "share-public-access",
         tokenHash
       ].filter(Boolean).join(":");
       const repository = new ShareRepository(db2);
@@ -7914,6 +7949,24 @@ var shareRateLimit = (options) => {
         lockMs: SHARE_RATE_LIMIT_LOCK_MS
       });
       if (!decision.allowed) {
+        const share = await repository.findByTokenHash(tokenHash);
+        if (share) {
+          await repository.insertAuditEvent({
+            id: createId2("share-audit"),
+            shareId: share.id,
+            eventType: "access_denied_threshold",
+            actorType: "recipient",
+            eventAt: Date.now(),
+            ownerId: share.ownerId,
+            ipHash: null,
+            userAgentHash: null,
+            metadata: toMetadata2({
+              attempts: decision.attempts,
+              lockedUntil: decision.lockedUntil ?? null,
+              windowMs: SHARE_RATE_LIMIT_WINDOW_MS
+            })
+          });
+        }
         logger.warn("[ShareRateLimit] access blocked");
         throw new AppError("share_inaccessible", 404);
       }
