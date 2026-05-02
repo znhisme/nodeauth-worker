@@ -9,6 +9,14 @@ import {
 import { getShareSecretPepper, hashShareSecret } from '@/features/share/shareSecurity';
 import { logger } from '@/shared/utils/logger';
 
+function createId(prefix: string): string {
+    return `${prefix}-${crypto.randomUUID()}`;
+}
+
+function toMetadata(value: Record<string, unknown>): string {
+    return JSON.stringify(value);
+}
+
 export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }) => {
     return async (c: Context<{ Bindings: EnvBindings }>, next: Next) => {
         const db = c.env.DB;
@@ -26,7 +34,7 @@ export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }
                 : [
                     'share',
                     c.req.header('CF-Connecting-IP') || 'unknown',
-                    c.req.path,
+                    'share-public-access',
                     tokenHash,
                 ].filter(Boolean).join(':');
             const repository = new ShareRepository(db);
@@ -39,6 +47,24 @@ export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }
             });
 
             if (!decision.allowed) {
+                const share = await repository.findByTokenHash(tokenHash);
+                if (share) {
+                    await repository.insertAuditEvent({
+                        id: createId('share-audit'),
+                        shareId: share.id,
+                        eventType: 'access_denied_threshold',
+                        actorType: 'recipient',
+                        eventAt: Date.now(),
+                        ownerId: share.ownerId,
+                        ipHash: null,
+                        userAgentHash: null,
+                        metadata: toMetadata({
+                            attempts: decision.attempts,
+                            lockedUntil: decision.lockedUntil ?? null,
+                            windowMs: SHARE_RATE_LIMIT_WINDOW_MS,
+                        }),
+                    });
+                }
                 logger.warn('[ShareRateLimit] access blocked');
                 throw new AppError('share_inaccessible', 404);
             }
