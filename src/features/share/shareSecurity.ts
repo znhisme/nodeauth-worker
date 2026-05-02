@@ -7,7 +7,7 @@ import {
     SHARE_RATE_LIMIT_MAX_ATTEMPTS,
     SHARE_RATE_LIMIT_WINDOW_MS,
     SHARE_TOKEN_BYTES,
-} from '@/features/share/shareTypes';
+} from './shareTypes';
 
 const textEncoder = new TextEncoder();
 
