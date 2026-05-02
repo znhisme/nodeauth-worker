@@ -14,6 +14,7 @@ import vaultRoutes from '@/features/vault/vaultRoutes';
 import backupRoutes from '@/features/backup/backupRoutes';
 import telegramRoutes from '@/features/telegram/telegramRoutes';
 import toolsRoutes from '@/features/tools/toolsRoutes';
+import shareRoutes from '@/features/share/shareRoutes';
 import healthRoutes from '@/features/health/healthRoutes';
 import emergencyRoutes from '@/features/emergency/emergencyRoutes';
 import wcProxyRoutes from '@/features/auth/wcProxyRoutes';
@@ -115,6 +116,7 @@ app.route('/api/vault', vaultRoutes);
 app.route('/api/backups', backupRoutes);
 app.route('/api/telegram', telegramRoutes);
 app.route('/api/tools', toolsRoutes);
+app.route('/api/share', shareRoutes);
 app.route('/api/oauth/wc-proxy', wcProxyRoutes);
 
 // ---------------------------------------------------------
