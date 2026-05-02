@@ -15,11 +15,11 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 
 ### Share State
 
-- [ ] **STATE-01**: System can persist share-link records for exactly one owner-accessible vault/account item per link.
+- [x] **STATE-01**: System can persist share-link records for exactly one owner-accessible vault/account item per link.
 - [x] **STATE-02**: System stores share URL tokens and access codes only as hashes or derived values, never as recoverable plaintext after creation.
-- [ ] **STATE-03**: System enforces required expiration, owner revocation, deleted-item checks, and inaccessible-share status in server-side repository/service logic.
-- [ ] **STATE-04**: System records safe audit events for share creation, successful access, failed access threshold, expiration, and revocation without logging passwords, TOTP seeds, raw tokens, access codes, or full share URLs.
-- [ ] **STATE-05**: System applies share-specific rate limiting for public token/code access and fails closed when that protection cannot be enforced.
+- [x] **STATE-03**: System enforces required expiration, owner revocation, deleted-item checks, and inaccessible-share status in server-side repository/service logic.
+- [x] **STATE-04**: System records safe audit events for share creation, successful access, failed access threshold, expiration, and revocation without logging passwords, TOTP seeds, raw tokens, access codes, or full share URLs.
+- [x] **STATE-05**: System applies share-specific rate limiting for public token/code access and fails closed when that protection cannot be enforced.
 
 ### Owner API
 
@@ -91,11 +91,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-01 | Phase 1 | Complete |
 | FND-02 | Phase 1 | Complete |
 | FND-03 | Phase 1 | Complete |
-| STATE-01 | Phase 1 | Pending |
+| STATE-01 | Phase 1 | Complete |
 | STATE-02 | Phase 1 | Complete |
-| STATE-03 | Phase 1 | Pending |
-| STATE-04 | Phase 1 | Pending |
-| STATE-05 | Phase 1 | Pending |
+| STATE-03 | Phase 1 | Complete |
+| STATE-04 | Phase 1 | Complete |
+| STATE-05 | Phase 1 | Complete |
 | OWN-01 | Phase 2 | Pending |
 | OWN-02 | Phase 2 | Pending |
 | OWN-03 | Phase 2 | Pending |
