@@ -13,9 +13,12 @@ import {
 } from '@/features/share/shareSecurity';
 import {
     type CreateShareInput,
+    type OwnerShareCreatedView,
+    type OwnerShareMetadataView,
     type CreateShareResult,
     type ResolveShareAccessInput,
     type ShareAccessDecision,
+    type ShareLinkRecord,
     SHARE_DEFAULT_TTL_SECONDS,
     SHARE_MAX_TTL_SECONDS,
 } from '@/features/share/shareTypes';

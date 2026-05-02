@@ -21,6 +21,29 @@ export interface SharedItemView {
     };
 }
 
+export interface OwnerShareItemReferenceView {
+    id: string;
+    service: string;
+    account: string;
+}
+
+export interface OwnerShareMetadataView {
+    id: string;
+    item: OwnerShareItemReferenceView;
+    status: ShareStatus;
+    createdAt: string;
+    expiresAt: string;
+    revokedAt: string | null;
+    lastAccessedAt: string | null;
+    accessCount: number;
+    publicUrl?: string;
+}
+
+export interface OwnerShareCreatedView extends OwnerShareMetadataView {
+    rawToken: string;
+    rawAccessCode: string;
+}
+
 export interface ShareLinkRecord {
     id: string;
     ownerId: string;
@@ -32,6 +55,8 @@ export interface ShareLinkRecord {
     revokedAt?: string | null;
     createdAt: string;
     updatedAt: string;
+    lastAccessedAt?: string | null;
+    accessCount?: number;
     publicUrl?: string;
 }
 

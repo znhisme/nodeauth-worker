@@ -37,6 +37,14 @@ export class ShareRepository {
         return result[0] || null;
     }
 
+    async listForOwner(ownerId: string): Promise<ShareLink[]> {
+        return await this.db
+            .select()
+            .from(shareLinks)
+            .where(eq(shareLinks.ownerId, ownerId))
+            .orderBy(desc(shareLinks.createdAt));
+    }
+
     async revokeForOwner(id: string, ownerId: string, revokedAt: number): Promise<boolean> {
         const existing = await this.findByIdForOwner(id, ownerId);
         if (!existing || (existing.revokedAt !== null && existing.revokedAt !== undefined)) {
