@@ -23,27 +23,27 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 
 ### Owner API
 
-- [ ] **OWN-01**: Authenticated owner can create a share link for one vault/account item they are allowed to access.
-- [ ] **OWN-02**: Link creation requires an expiration time within the configured maximum and requires an independent access code by default.
-- [ ] **OWN-03**: Link creation returns the raw share URL token and access code exactly once.
-- [ ] **OWN-04**: Authenticated owner can list share links with safe metadata such as item reference, status, created time, expiration, last accessed time, and access count.
-- [ ] **OWN-05**: Authenticated owner can inspect one share link without receiving raw token, raw access code, or shared credential values.
-- [ ] **OWN-06**: Authenticated owner can revoke one share link, and revoked links immediately stop working for public recipients.
-- [ ] **OWN-07**: Owner APIs enforce existing auth/session/CSRF/ownership protections and cannot create, read, or revoke links for another owner's vault item.
+- [x] **OWN-01**: Authenticated owner can create a share link for one vault/account item they are allowed to access.
+- [x] **OWN-02**: Link creation requires an expiration time within the configured maximum and requires an independent access code by default.
+- [x] **OWN-03**: Link creation returns the raw share URL token and access code exactly once.
+- [x] **OWN-04**: Authenticated owner can list share links with safe metadata such as item reference, status, created time, expiration, last accessed time, and access count.
+- [x] **OWN-05**: Authenticated owner can inspect one share link without receiving raw token, raw access code, or shared credential values.
+- [x] **OWN-06**: Authenticated owner can revoke one share link, and revoked links immediately stop working for public recipients.
+- [x] **OWN-07**: Owner APIs enforce existing auth/session/CSRF/ownership protections and cannot create, read, or revoke links for another owner's vault item.
 
 ### Recipient API
 
-- [ ] **REC-01**: Friend can open a public HTTP share link without having a NodeAuth account.
-- [ ] **REC-02**: Public recipient access requires the independent access code through a request body or equivalent non-URL channel.
-- [ ] **REC-03**: Public recipient access returns a minimal `SharedItemView` DTO for only the shared item and never returns unrelated vault data, owner session data, backup metadata, admin metadata, raw internal IDs, raw share tokens, or access-code hashes.
-- [ ] **REC-04**: Public recipient access includes the current TOTP code and countdown when the shared item has TOTP data, while raw TOTP seed disclosure is unsupported by default.
-- [ ] **REC-05**: Public recipient endpoints use generic inaccessible-share errors for missing, invalid, expired, revoked, deleted, locked, or wrong-code states.
-- [ ] **REC-06**: Public recipient endpoints set no-store/no-referrer style response protections and avoid leaking sensitive values through query strings or logs.
+- [x] **REC-01**: Friend can open a public HTTP share link without having a NodeAuth account.
+- [x] **REC-02**: Public recipient access requires the independent access code through a request body or equivalent non-URL channel.
+- [x] **REC-03**: Public recipient access returns a minimal `SharedItemView` DTO for only the shared item and never returns unrelated vault data, owner session data, backup metadata, admin metadata, raw internal IDs, raw share tokens, or access-code hashes.
+- [x] **REC-04**: Public recipient access includes the current TOTP code and countdown when the shared item has TOTP data, while raw TOTP seed disclosure is unsupported by default.
+- [x] **REC-05**: Public recipient endpoints use generic inaccessible-share errors for missing, invalid, expired, revoked, deleted, locked, or wrong-code states.
+- [x] **REC-06**: Public recipient endpoints set no-store/no-referrer style response protections and avoid leaking sensitive values through query strings or logs.
 
 ### Cleanup And UX Contract
 
 - [ ] **UX-01**: System can clean up or mark expired shares and stale share rate-limit state through scheduled or opportunistic backend work.
-- [ ] **UX-02**: API contract exposes enough safe status information for a future owner UI to distinguish active, expired, revoked, and accessed links.
+- [x] **UX-02**: API contract exposes enough safe status information for a future owner UI to distinguish active, expired, revoked, and accessed links.
 - [ ] **UX-03**: API contract and project notes clearly explain that revocation stops future link access but cannot retract credential data already copied by the recipient.
 - [x] **UX-04**: If editable frontend source is available, implementation scope identifies the owner and recipient UI surfaces needed for share creation, access-code entry, reveal/copy, and revoke flows; otherwise v1 remains API-only with documented contracts.
 
@@ -96,21 +96,21 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STATE-03 | Phase 1 | Complete |
 | STATE-04 | Phase 1 | Complete |
 | STATE-05 | Phase 1 | Complete |
-| OWN-01 | Phase 2 | Pending |
-| OWN-02 | Phase 2 | Pending |
-| OWN-03 | Phase 2 | Pending |
-| OWN-04 | Phase 2 | Pending |
-| OWN-05 | Phase 2 | Pending |
-| OWN-06 | Phase 2 | Pending |
-| OWN-07 | Phase 2 | Pending |
-| REC-01 | Phase 2 | Pending |
-| REC-02 | Phase 2 | Pending |
-| REC-03 | Phase 2 | Pending |
-| REC-04 | Phase 2 | Pending |
-| REC-05 | Phase 2 | Pending |
-| REC-06 | Phase 2 | Pending |
+| OWN-01 | Phase 2 | Complete |
+| OWN-02 | Phase 2 | Complete |
+| OWN-03 | Phase 2 | Complete |
+| OWN-04 | Phase 2 | Complete |
+| OWN-05 | Phase 2 | Complete |
+| OWN-06 | Phase 2 | Complete |
+| OWN-07 | Phase 2 | Complete |
+| REC-01 | Phase 2 | Complete |
+| REC-02 | Phase 2 | Complete |
+| REC-03 | Phase 2 | Complete |
+| REC-04 | Phase 2 | Complete |
+| REC-05 | Phase 2 | Complete |
+| REC-06 | Phase 2 | Complete |
 | UX-01 | Phase 3 | Pending |
-| UX-02 | Phase 2 | Pending |
+| UX-02 | Phase 2 | Complete |
 | UX-03 | Phase 3 | Pending |
 | UX-04 | Phase 1 | Complete |
 | HARD-01 | Phase 3 | Pending |
