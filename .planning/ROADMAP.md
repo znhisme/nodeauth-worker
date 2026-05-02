@@ -28,12 +28,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Maintainer has a written security contract covering token/code handling, expiration, revocation, TOTP disclosure, logging, cache/referrer protections, canonical public origin, and UI/API-only scope.
   4. System can persist each share link for exactly one owner-accessible vault/account item while storing raw share URL tokens and access codes only as hashes or derived values after creation.
   5. Expiration, revocation, deleted-item checks, audit events, and fail-closed share-specific rate limiting are enforced in service/repository logic before route behavior depends on them.
-**Plans**: 4 plans
+**Plans**: 6 plans
 Plans:
 - [x] 01-01-PLAN.md — Restore editable backend source, provenance, backend lockfile, and reproducible target build scripts.
 - [x] 01-02-PLAN.md — Define share-link security contract, domain types, and token/access-code security primitives.
 - [x] 01-03-PLAN.md — Add durable share schema, repository/service enforcement, audit, and fail-closed rate limiting.
 - [x] 01-04-PLAN.md — Run blocking schema/migration/test/build alignment validation across backend targets.
+- [ ] 01-05-PLAN.md — Close source-level security gaps for raw-token rate limiting, public decisions, headers, and revocation semantics.
+- [ ] 01-06-PLAN.md — Regenerate backend bundles and run source-map, full test, and schema alignment validation.
 **UI hint**: yes
 
 ### Phase 2: Share Link API
@@ -69,7 +71,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Security Primitives | 3/4 | In Progress | - |
+| 1. Foundation and Security Primitives | 4/6 | In Progress | - |
 | 2. Share Link API | 0/TBD | Not started | - |
 | 3. Cleanup, Compatibility, and Hardening | 0/TBD | Not started | - |
 
