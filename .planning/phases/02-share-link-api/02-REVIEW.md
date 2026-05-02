@@ -1,6 +1,6 @@
 ---
 phase: 02-share-link-api
-reviewed: 2026-05-02T21:56:18Z
+reviewed: 2026-05-02T23:42:34Z
 depth: standard
 files_reviewed: 16
 files_reviewed_list:
@@ -21,69 +21,33 @@ files_reviewed_list:
   - src/shared/middleware/shareRateLimitMiddleware.test.ts
   - src/shared/middleware/shareRateLimitMiddleware.ts
 findings:
-  critical: 1
-  warning: 2
+  critical: 0
+  warning: 1
   info: 0
-  total: 3
+  total: 1
 status: issues_found
 ---
 
 # Phase 02: Code Review Report
 
-**Reviewed:** 2026-05-02T21:56:18Z
+**Reviewed:** 2026-05-02T23:42:34Z
 **Depth:** standard
 **Files Reviewed:** 16
 **Status:** issues_found
 
 ## Summary
 
-The share-link flow is mostly well-contained, but I found one cross-origin auth exposure, one secret-processing order issue, and one generated MySQL migration that will not bootstrap cleanly.
+Re-reviewed the listed source and generated runtime files after the 02-05 and 02-06 gap closures. The previous credentialed CORS finding is closed in source and all generated bundles: `/api/*` CORS now delegates to `resolveApiCorsOrigin(origin, c.env)` and no longer directly reflects arbitrary origins. The previous access-code ordering finding is also closed in source and all generated bundles: public share access verifies `accessCode` before `decryptField()` and OTP `generate()`.
 
-## Critical Issues
-
-### CR-01: Credentialed CORS reflects every origin
-
-**File:** `src/app/index.ts:61-67`
-**Issue:** The API CORS middleware echoes any request `Origin` while also enabling `credentials: true`. That allows arbitrary websites to make credentialed requests against authenticated `/api/*` endpoints and read the JSON response, which is a cross-origin authorization gap.
-**Fix:**
-```ts
-const allowedOrigins = new Set([
-    c.env.NODEAUTH_PUBLIC_ORIGIN,
-    c.env.NODEAUTH_APP_ORIGIN,
-].filter(Boolean));
-
-app.use('/api/*', cors({
-    origin: (origin) => (origin && allowedOrigins.has(origin) ? origin : ''),
-    credentials: false,
-    allowHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
-    allowMethods: ['POST', 'GET', 'OPTIONS', 'PUT', 'DELETE'],
-    maxAge: 86400,
-}));
-```
+One compatibility warning remains in the generated runtime migration path for MySQL-backed Docker deployments.
 
 ## Warnings
 
-### WR-01: Vault secret is decrypted before recipient access code is verified
+### WR-01: MySQL share-link migration indexes unbounded TEXT columns
 
-**File:** `src/features/share/shareService.ts:263-293`
-**Issue:** `resolveShareAccess()` decrypts the vault secret and generates the OTP before it checks `accessCode`. A bad access code should short-circuit first so invalid requests never touch the protected secret or its derived output.
-**Fix:**
-```ts
-const accessCode = input.accessCode || '';
-const accessCodeOk = await verifyShareSecret(pepper, 'share-access-code', accessCode, share.accessCodeHash);
-if (!accessCodeOk) {
-    return { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
-}
-
-const decryptedSecret = await decryptField(vaultItem.secret, this.env.ENCRYPTION_KEY || this.env.JWT_SECRET || '');
-// generate OTP only after the access code passes
-```
-
-### WR-02: MySQL migration in generated bundles uses incompatible `TEXT` primary key columns
-
-**File:** `backend/dist/docker/server.js:8620-8622`
-**Issue:** The generated MySQL migration emits `share_links.id TEXT PRIMARY KEY` and related `TEXT` columns, while the source MySQL schema uses fixed-length `VARCHAR` fields. On a fresh MySQL-backed Docker deployment, this migration is likely to fail or create invalid key definitions. The same defect is mirrored in the Netlify and Worker bundles.
-**Fix:**
+**File:** `backend/dist/docker/server.js:8646`
+**Issue:** The generated MySQL migration for `create_share_link_tables` declares share identifier/hash columns as `TEXT`, then creates indexes on those columns without prefix lengths, for example `idx_share_links_vault_item`, `idx_share_links_owner`, and `idx_share_links_token_hash`. The dialect transformer only rewrites `TEXT PRIMARY KEY`, so non-primary indexed columns remain `TEXT`. A fresh MySQL-backed Docker deployment can fail while applying this share-link migration because MySQL requires indexed `TEXT` columns to use a key length. The same migration text is mirrored in `backend/dist/netlify/api.mjs` and `backend/dist/worker/worker.js`, though Docker/MySQL is the runtime path most directly affected.
+**Fix:** Use bounded MySQL column types or index prefixes in the source migration and regenerate all backend bundles. For example:
 ```sql
 CREATE TABLE IF NOT EXISTS share_links (
     id VARCHAR(36) PRIMARY KEY,
@@ -91,13 +55,19 @@ CREATE TABLE IF NOT EXISTS share_links (
     owner_id VARCHAR(255) NOT NULL,
     token_hash VARCHAR(255) NOT NULL,
     access_code_hash VARCHAR(255) NOT NULL,
-    ...
+    expires_at BIGINT NOT NULL,
+    revoked_at BIGINT,
+    created_at BIGINT NOT NULL,
+    last_accessed_at BIGINT,
+    access_count BIGINT DEFAULT 0
 );
+CREATE INDEX idx_share_links_vault_item ON share_links(vault_item_id);
+CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
+CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
 ```
-Regenerate `backend/dist/docker/server.js`, `backend/dist/netlify/api.mjs`, and `backend/dist/worker/worker.js` from the corrected source schema.
 
 ---
 
-_Reviewed: 2026-05-02T21:56:18Z_
+_Reviewed: 2026-05-02T23:42:34Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
