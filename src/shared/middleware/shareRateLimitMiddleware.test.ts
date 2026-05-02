@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AppError } from '@/app/config';
 import { shareRateLimit } from '@/shared/middleware/shareRateLimitMiddleware';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
-import { hashShareSecret } from '@/features/share/shareSecurity';
+import { getSharePublicHeaders, hashShareSecret } from '@/features/share/shareSecurity';
 
 const expectSerializedNotToContain = (value: unknown, forbiddenValues: string[]) => {
     const serialized = JSON.stringify(value);
@@ -17,16 +16,24 @@ const makeContext = (overrides: any = {}) => {
         SHARE_SECRET_PEPPER: 'pepper',
         JWT_SECRET: 'jwt',
     };
+    const headers = new Headers();
     return {
         env: {
             ...defaultEnv,
             ...(overrides.env || {}),
         },
         req: {
-        header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
-        path: '/share/token',
-        param: vi.fn((name: string) => (name === 'token' ? 'token-1' : undefined)),
+            header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
+            path: '/share/token',
+            param: vi.fn((name: string) => (name === 'token' ? 'token-1' : undefined)),
         },
+        header: vi.fn((name: string, value: string) => {
+            headers.set(name, value);
+        }),
+        json: vi.fn((body: unknown, status: number) => new Response(JSON.stringify(body), {
+            status,
+            headers,
+        })),
         ...overrides,
         env: {
             ...defaultEnv,
@@ -35,18 +42,32 @@ const makeContext = (overrides: any = {}) => {
     };
 };
 
+const expectShareInaccessibleResponse = async (response: Response) => {
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+        success: false,
+        message: 'share_inaccessible',
+        data: null,
+    });
+
+    for (const [name, value] of Object.entries(getSharePublicHeaders())) {
+        expect(response.headers.get(name)).toBe(value);
+    }
+};
+
 describe('shareRateLimit', () => {
     afterEach(() => {
         vi.restoreAllMocks();
     });
 
-    it('throws share_inaccessible when DB is missing', async () => {
+    it('returns generic share_inaccessible response when DB is missing', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext({ env: { DB: undefined } });
-        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ name: 'AppError', message: 'share_inaccessible', statusCode: 404 });
+        const response = await middleware(ctx as any, vi.fn()) as Response;
+        await expectShareInaccessibleResponse(response);
     });
 
-    it('throws share_inaccessible when repository errors', async () => {
+    it('returns generic share_inaccessible response when repository errors', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext();
         const next = vi.fn();
@@ -54,10 +75,12 @@ describe('shareRateLimit', () => {
             select: vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(() => Promise.reject(new Error('boom'))) })) })) })),
         };
         ctx.env.DB = db;
-        await expect(middleware(ctx as any, next)).rejects.toMatchObject({ message: 'share_inaccessible' });
+        const response = await middleware(ctx as any, next) as Response;
+        await expectShareInaccessibleResponse(response);
+        expect(next).not.toHaveBeenCalled();
     });
 
-    it('throws share_inaccessible when decision is denied', async () => {
+    it('returns generic share_inaccessible response when decision is denied', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext({
             env: {
@@ -73,7 +96,8 @@ describe('shareRateLimit', () => {
             attempts: 6,
             lockedUntil: Date.now(),
         });
-        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
+        const response = await middleware(ctx as any, vi.fn()) as Response;
+        await expectShareInaccessibleResponse(response);
     });
 
     it('records a safe audit event when a real share reaches the denied threshold', async () => {
@@ -102,7 +126,8 @@ describe('shareRateLimit', () => {
         } as any);
         const insertAuditEvent = vi.spyOn(ShareRepository.prototype, 'insertAuditEvent').mockResolvedValue();
 
-        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
+        const response = await middleware(ctx as any, vi.fn()) as Response;
+        await expectShareInaccessibleResponse(response);
 
         const limiterInput = enforceRateLimit.mock.calls[0][0];
         expect(limiterInput.key).not.toContain(rawToken);
@@ -167,7 +192,8 @@ describe('shareRateLimit', () => {
         vi.spyOn(ShareRepository.prototype, 'findByTokenHash').mockResolvedValue(null);
         const insertAuditEvent = vi.spyOn(ShareRepository.prototype, 'insertAuditEvent').mockResolvedValue();
 
-        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
+        const response = await middleware(ctx as any, vi.fn()) as Response;
+        await expectShareInaccessibleResponse(response);
 
         expect(insertAuditEvent).not.toHaveBeenCalled();
     });

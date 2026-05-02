@@ -11,12 +11,17 @@ const mocks = vi.hoisted(() => {
     const listSharesForOwner = vi.fn();
     const getShareForOwner = vi.fn();
     const revokeShareForOwner = vi.fn();
+    const resolveShareAccess = vi.fn();
     const createShareService = vi.fn(() => ({
         createShareForOwner,
         listSharesForOwner,
         getShareForOwner,
         revokeShareForOwner,
+        resolveShareAccess,
     }));
+    const shareRateLimit = vi.fn(() => async (_c: any, next: any) => {
+        await next();
+    });
 
     return {
         authMiddleware,
@@ -24,7 +29,9 @@ const mocks = vi.hoisted(() => {
         listSharesForOwner,
         getShareForOwner,
         revokeShareForOwner,
+        resolveShareAccess,
         createShareService,
+        shareRateLimit,
     };
 });
 
@@ -34,6 +41,10 @@ vi.mock('@/shared/middleware/auth', () => ({
 
 vi.mock('@/features/share/shareService', () => ({
     createShareService: mocks.createShareService,
+}));
+
+vi.mock('@/shared/middleware/shareRateLimitMiddleware', () => ({
+    shareRateLimit: mocks.shareRateLimit,
 }));
 
 import shareRoutes from '@/features/share/shareRoutes';
@@ -76,6 +87,12 @@ const expectOwnerResponseIsSafe = (value: unknown, allowCreateSecrets = false) =
         expect(serialized).not.toContain('rawToken');
         expect(serialized).not.toContain('rawAccessCode');
     }
+};
+
+const expectPublicHeaders = (response: Response) => {
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Pragma')).toBe('no-cache');
+    expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
 };
 
 describe('Share link routes', () => {
@@ -198,5 +215,90 @@ describe('Share link routes', () => {
 
         expect(response.status).toBe(200);
         expect(mocks.listSharesForOwner).toHaveBeenCalledWith('user-id-1');
+    });
+
+    it('POST /api/share/public/:token/access accepts accessCode from the body only', async () => {
+        mocks.resolveShareAccess.mockResolvedValue({
+            accessible: true,
+            status: 'active',
+            itemView: {
+                service: 'GitHub',
+                account: 'friend@example.com',
+                otp: {
+                    code: '123456',
+                    period: 30,
+                    remainingSeconds: 12,
+                },
+            },
+            publicHeaders: {
+                'Cache-Control': 'no-store',
+                Pragma: 'no-cache',
+                'Referrer-Policy': 'no-referrer',
+            },
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/public/raw-token-123/access?accessCode=query-code', {
+            method: 'POST',
+            body: JSON.stringify({ accessCode: 'code-123' }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body).toEqual({
+            success: true,
+            data: {
+                service: 'GitHub',
+                account: 'friend@example.com',
+                otp: {
+                    code: '123456',
+                    period: 30,
+                    remainingSeconds: 12,
+                },
+            },
+        });
+        expect(mocks.authMiddleware).not.toHaveBeenCalled();
+        expect(mocks.shareRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.resolveShareAccess).toHaveBeenCalledWith({
+            token: 'raw-token-123',
+            accessCode: 'code-123',
+            requestOrigin: 'https://nodeauth.test',
+        });
+        expect(JSON.stringify(mocks.resolveShareAccess.mock.calls)).not.toContain('query-code');
+        expectPublicHeaders(response);
+    });
+
+    it('POST /api/share/public/:token/access returns generic inaccessible JSON and headers', async () => {
+        mocks.resolveShareAccess.mockResolvedValue({
+            accessible: false,
+            status: 'revoked',
+            reason: 'inaccessible',
+            share: null,
+            itemView: null,
+            publicHeaders: {
+                'Cache-Control': 'no-store',
+                Pragma: 'no-cache',
+                'Referrer-Policy': 'no-referrer',
+            },
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/public/raw-token-123/access', {
+            method: 'POST',
+            body: JSON.stringify({ accessCode: 'wrong-code' }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(404);
+        expect(body).toEqual({ success: false, message: 'share_inaccessible', data: null });
+        expect(JSON.stringify(body)).not.toContain('revoked');
+        expect(JSON.stringify(body)).not.toContain('wrong-code');
+        expectPublicHeaders(response);
     });
 });
