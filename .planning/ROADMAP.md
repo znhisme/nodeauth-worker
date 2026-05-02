@@ -36,7 +36,7 @@ Plans:
 - [x] 01-04-PLAN.md — Run blocking schema/migration/test/build alignment validation across backend targets.
 - [x] 01-05-PLAN.md — Close source-level security gaps for raw-token rate limiting, public decisions, headers, and revocation semantics.
 - [x] 01-06-PLAN.md — Regenerate backend bundles and run source-map, full test, and schema alignment validation.
-- [ ] 01-07-PLAN.md — Close remaining STATE-04 audit gaps for successful access, expiration, and threshold denial.
+- [x] 01-07-PLAN.md — Close remaining STATE-04 audit gaps for successful access, expiration, and threshold denial.
 **UI hint**: yes
 
 ### Phase 2: Share Link API

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-05-02T16:15:36.322Z"
+status: executing
+stopped_at: Completed 01-07-PLAN.md
+last_updated: "2026-05-02T17:34:01.843Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 7
+  completed_plans: 7
   percent: 100
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 ## Current Position
 
 Phase: 01 (foundation-and-security-primitives) — EXECUTING
-Plan: 6 of 6
-Status: Phase complete — ready for verification
+Plan: 2 of 7
+Status: Ready to execute
 Last activity: 2026-05-02
 
 Progress: [██████████] 100%
@@ -57,6 +57,7 @@ Progress: [██████████] 100%
 | Phase 01-foundation-and-security-primitives P03 | 55min | 3 tasks | 15 files |
 | Phase 01 P05 | 7min | 3 tasks | 7 files |
 | Phase 01 P06 | 1min | 2 tasks | 6 files |
+| Phase 01 P07 | 10min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -76,6 +77,9 @@ Recent decisions affecting current work:
 - [Phase 01-foundation-and-security-primitives]: Keep Phase 1 API-only because editable frontend source is absent in this checkout.
 - [Phase 01-foundation-and-security-primitives]: Keep share access enforcement below routes so route handlers depend on tested repository and service primitives.
 - [Phase 01-foundation-and-security-primitives]: Use a dedicated fail-closed share rate-limit middleware instead of the existing fail-open `rateLimit()` helper.
+- [Phase 01-foundation-and-security-primitives]: Keep successful-access, expired, and threshold-denial audit writes below the route layer so Phase 2 routes inherit STATE-04 behavior.
+- [Phase 01-foundation-and-security-primitives]: Use a static share-public-access route-family component for default limiter keys instead of persisting request paths that may contain raw tokens.
+- [Phase 01-foundation-and-security-primitives]: Skip threshold-denial audit insertion when a derived token hash does not resolve to a share because audit rows require real owner and share IDs.
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-02T14:18:16.552Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-05-02T17:34:01.835Z
+Stopped at: Completed 01-07-PLAN.md
 Resume file: None
