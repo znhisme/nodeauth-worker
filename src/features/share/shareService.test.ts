@@ -1,8 +1,9 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { AppError } from '@/app/config';
 import { ShareService } from '@/features/share/shareService';
 import { hashShareSecret } from '@/features/share/shareSecurity';
-import { encryptField } from '@/shared/db/db';
+import * as dbModule from '@/shared/db/db';
+import * as otpModule from '@/shared/utils/otp';
 
 const makeVaultItem = (overrides: any = {}) => ({
     id: 'vault-1',
@@ -80,6 +81,10 @@ describe('ShareService', () => {
             vaultRepository,
             shareRepository,
         );
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it('rejects a missing vault item with share_item_inaccessible', async () => {
@@ -347,7 +352,7 @@ describe('ShareService', () => {
         const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ tokenHash, accessCodeHash }));
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
-            secret: await encryptField('JBSWY3DPEHPK3PXP', 'jwt'),
+            secret: await dbModule.encryptField('JBSWY3DPEHPK3PXP', 'jwt'),
         }));
 
         const decision = await service.resolveShareAccess({
@@ -408,6 +413,76 @@ describe('ShareService', () => {
             accessedAt: 1000,
             status: 'active',
         }));
+    });
+
+    it('wrong-code access does not decrypt or generate OTP output', async () => {
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        const generateSpy = vi.spyOn(otpModule, 'generate');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'wrong-code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({
+            accessible: false,
+            status: 'active',
+            reason: 'inaccessible',
+            itemView: null,
+        });
+        expect(decryptSpy).not.toHaveBeenCalled();
+        expect(generateSpy).not.toHaveBeenCalled();
+        expect(shareRepository.markAccessed).not.toHaveBeenCalled();
+        expect(shareRepository.insertAuditEvent).not.toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'access_granted',
+        }));
+    });
+
+    it('correct-code access decrypts once, generates OTP, marks accessed, and records a safe audit event', async () => {
+        const accessCode = 'correct-code';
+        const accessCodeHash = await hashShareSecret('pepper', 'share-access-code', accessCode);
+        const rawToken = 'raw-public-token-123';
+        const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        const generateSpy = vi.spyOn(otpModule, 'generate');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ tokenHash, accessCodeHash }));
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            secret: await dbModule.encryptField('JBSWY3DPEHPK3PXP', 'jwt'),
+        }));
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode,
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({
+            accessible: true,
+            status: 'active',
+            itemView: {
+                service: 'GitHub',
+                account: 'user@example.com',
+                otp: {
+                    code: expect.any(String),
+                    period: 30,
+                    remainingSeconds: 29,
+                },
+            },
+        });
+        expect(decryptSpy).toHaveBeenCalledTimes(1);
+        expect(generateSpy).toHaveBeenCalledTimes(1);
+        expect(shareRepository.markAccessed).toHaveBeenCalledWith('share-1', 1000);
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            shareId: 'share-1',
+            eventType: 'access_granted',
+            actorType: 'recipient',
+            eventAt: 1000,
+            ownerId: 'owner-1',
+        }));
+        expectRecipientSafeDecision(decision);
     });
 
     it('records an expired audit event before returning an inaccessible expired decision', async () => {
