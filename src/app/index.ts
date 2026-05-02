@@ -37,6 +37,13 @@ const app = new Hono<{ Bindings: Bindings }>();
 // 1. 全局中间件 & 安全初始化 (Middleware Layer)
 // ---------------------------------------------------------
 
+export function redactSharePublicToken(value: string): string {
+    return value.replace(
+        /\/api\/share\/public\/[^\s/?#]+\/access/g,
+        '/api/share/public/[share-token]/access',
+    );
+}
+
 // 1.1 环境拦截与自动化解密 (新特性：支持 aes: 前缀深度解析)
 app.use('*', async (c, next) => {
     // 自动扫描 c.env 并根据 JWT_SECRET 作为根密钥进行环境变量解密
@@ -47,7 +54,7 @@ app.use('*', async (c, next) => {
 });
 
 // 1.2 全球请求日志注入: 通过统一 Logger 进行过滤
-app.use('*', hLogger((str) => logger.info(str)));
+app.use('*', hLogger((str) => logger.info(redactSharePublicToken(str))));
 
 // 1.3 跨域策略 (CORS)
 app.use('/api/*', cors({
