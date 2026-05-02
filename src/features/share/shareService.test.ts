@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AppError } from '@/app/config';
 import { ShareService } from '@/features/share/shareService';
 import { hashShareSecret } from '@/features/share/shareSecurity';
+import { encryptField } from '@/shared/db/db';
 
 const makeVaultItem = (overrides: any = {}) => ({
     id: 'vault-1',
@@ -68,6 +69,7 @@ describe('ShareService', () => {
             createShareLink: vi.fn(),
             findByTokenHash: vi.fn(),
             findByIdForOwner: vi.fn(),
+            listForOwner: vi.fn(),
             revokeForOwner: vi.fn(),
             markAccessed: vi.fn(),
             insertAuditEvent: vi.fn(),
@@ -138,6 +140,100 @@ describe('ShareService', () => {
         expect(createInput.accessCodeHash).toMatch(/^[A-Za-z0-9_-]+$/);
         expect(JSON.stringify(createInput)).not.toContain(result.rawToken);
         expect(JSON.stringify(createInput)).not.toContain(result.rawAccessCode);
+    });
+
+    it('serializes owner metadata without forbidden secret fields and with descending status coverage', async () => {
+        shareRepository.listForOwner.mockResolvedValue([
+            makeShareRecord({
+                id: 'share-active',
+                expiresAt: 2000,
+                revokedAt: null,
+                createdAt: 3000,
+                lastAccessedAt: 3500,
+                accessCount: 2,
+            }),
+            makeShareRecord({
+                id: 'share-expired',
+                expiresAt: 900,
+                revokedAt: null,
+                createdAt: 2000,
+                lastAccessedAt: null,
+                accessCount: 1,
+            }),
+            makeShareRecord({
+                id: 'share-revoked',
+                expiresAt: 4000,
+                revokedAt: 2500,
+                createdAt: 1000,
+                lastAccessedAt: 2600,
+                accessCount: 3,
+            }),
+        ]);
+
+        vaultRepository.findActiveByIdForOwner
+            .mockResolvedValueOnce(makeVaultItem({ id: 'vault-1', service: 'GitHub', account: 'user@example.com' }))
+            .mockResolvedValueOnce(makeVaultItem({ id: 'vault-2', service: 'GitLab', account: 'team@example.com' }))
+            .mockResolvedValueOnce(makeVaultItem({ id: 'vault-3', service: 'Bitbucket', account: 'ops@example.com' }));
+
+        const views = await service.listSharesForOwner('owner-1', 1000);
+
+        expect(shareRepository.listForOwner).toHaveBeenCalledWith('owner-1');
+        expect(views.map((view: any) => view.status)).toEqual(['active', 'expired', 'revoked']);
+        expect(JSON.stringify(views)).not.toContain('tokenHash');
+        expect(JSON.stringify(views)).not.toContain('accessCodeHash');
+        expect(JSON.stringify(views)).not.toContain('rawToken');
+        expect(JSON.stringify(views)).not.toContain('rawAccessCode');
+        expect(JSON.stringify(views)).not.toContain('password');
+        expect(JSON.stringify(views)).not.toContain('secret');
+        expect(JSON.stringify(views)).not.toContain('seed');
+        expect(JSON.stringify(views)).not.toContain('otp');
+        expect(JSON.stringify(views)).not.toContain('ownerId');
+        expect(JSON.stringify(views)).not.toContain('session');
+    });
+
+    it('serializes owner detail and revoke views without forbidden secret fields', async () => {
+        shareRepository.findByIdForOwner.mockResolvedValueOnce(makeShareRecord({
+            id: 'share-1',
+            expiresAt: 2000,
+            revokedAt: null,
+            createdAt: 1000,
+            lastAccessedAt: 1500,
+            accessCount: 4,
+        }));
+        shareRepository.findByIdForOwner.mockResolvedValueOnce(makeShareRecord({
+            id: 'share-1',
+            expiresAt: 2000,
+            revokedAt: 1000,
+            createdAt: 1000,
+            lastAccessedAt: 1500,
+            accessCount: 4,
+        }));
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            id: 'vault-1',
+            service: 'GitHub',
+            account: 'user@example.com',
+        }));
+        shareRepository.revokeForOwner.mockResolvedValue(true);
+
+        const detail = await service.getShareForOwner('owner-1', 'share-1', 1000);
+        const revoked = await service.revokeShareForOwner('owner-1', 'share-1', 1000);
+
+        expect(shareRepository.findByIdForOwner).toHaveBeenCalledWith('share-1', 'owner-1');
+        expect(JSON.stringify(detail)).not.toContain('tokenHash');
+        expect(JSON.stringify(detail)).not.toContain('accessCodeHash');
+        expect(JSON.stringify(detail)).not.toContain('rawToken');
+        expect(JSON.stringify(detail)).not.toContain('rawAccessCode');
+        expect(JSON.stringify(detail)).not.toContain('password');
+        expect(JSON.stringify(detail)).not.toContain('secret');
+        expect(JSON.stringify(detail)).not.toContain('seed');
+        expect(JSON.stringify(detail)).not.toContain('otp');
+        expect(JSON.stringify(detail)).not.toContain('ownerId');
+        expect(JSON.stringify(detail)).not.toContain('session');
+        expect(JSON.stringify(revoked)).toContain('"status":"revoked"');
+        expect(JSON.stringify(revoked)).not.toContain('tokenHash');
+        expect(JSON.stringify(revoked)).not.toContain('accessCodeHash');
+        expect(JSON.stringify(revoked)).not.toContain('rawToken');
+        expect(JSON.stringify(revoked)).not.toContain('rawAccessCode');
     });
 
     it('returns inaccessible for expired revoked deleted-item and wrong-code cases', async () => {
@@ -250,7 +346,9 @@ describe('ShareService', () => {
         const rawToken = 'raw-public-token-123';
         const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ tokenHash, accessCodeHash }));
-        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            secret: await encryptField('JBSWY3DPEHPK3PXP', 'jwt'),
+        }));
 
         const decision = await service.resolveShareAccess({
             token: rawToken,
@@ -265,6 +363,11 @@ describe('ShareService', () => {
             itemView: {
                 service: 'GitHub',
                 account: 'user@example.com',
+                otp: {
+                    code: expect.any(String),
+                    period: 30,
+                    remainingSeconds: 29,
+                },
             },
         });
         expect(shareRepository.findByTokenHash).toHaveBeenCalledWith(tokenHash);
@@ -274,6 +377,8 @@ describe('ShareService', () => {
         expect(serializedDecision).not.toContain('https://');
         expect(serializedDecision).not.toContain('publicUrl');
         expect(serializedDecision).not.toContain('fullUrl');
+        expect(serializedDecision).not.toContain('seed');
+        expect(serializedDecision).not.toContain('otpauth');
         expect(vaultRepository.findActiveByIdForOwner).toHaveBeenCalledWith('vault-1', 'owner-1');
         expect(shareRepository.markAccessed).toHaveBeenCalledWith('share-1', 1000);
         expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({

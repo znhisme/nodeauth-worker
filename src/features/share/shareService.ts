@@ -1,6 +1,8 @@
 import { AppError, type EnvBindings } from '@/app/config';
+import { decryptField } from '@/shared/db/db';
 import { VaultRepository } from '@/shared/db/repositories/vaultRepository';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
+import { generate } from '@/shared/utils/otp';
 import {
     buildShareUrl,
     clampShareTtlSeconds,
@@ -33,12 +35,34 @@ function toMetadata(value: Record<string, unknown>): string {
     return JSON.stringify(value);
 }
 
+function toShareStatus(share: Pick<ShareLinkRecord, 'expiresAt' | 'revokedAt'>, now: number): 'active' | 'expired' | 'revoked' {
+    return share.revokedAt != null ? 'revoked' : (Number(share.expiresAt) <= now ? 'expired' : 'active');
+}
+
 export class ShareService {
     constructor(
         private env: EnvBindings,
         private vaultRepository: VaultRepository,
         private shareRepository: ShareRepository,
     ) {}
+
+    private toOwnerMetadataView(share: ShareLinkRecord, vaultItem: { id: string; service: string; account: string }, now: number, publicUrl?: string): OwnerShareMetadataView {
+        return {
+            id: share.id,
+            item: {
+                id: vaultItem.id,
+                service: vaultItem.service,
+                account: vaultItem.account,
+            },
+            status: toShareStatus(share, now),
+            createdAt: String(share.createdAt),
+            expiresAt: String(share.expiresAt),
+            revokedAt: share.revokedAt != null ? String(share.revokedAt) : null,
+            lastAccessedAt: share.lastAccessedAt != null ? String(share.lastAccessedAt) : null,
+            accessCount: Number(share.accessCount || 0),
+            ...(publicUrl ? { publicUrl } : {}),
+        };
+    }
 
     async createShare(input: CreateShareInput): Promise<CreateShareResult> {
         if (!input.ownerId || !input.vaultItemId) {
@@ -115,6 +139,74 @@ export class ShareService {
         };
     }
 
+    async createShareForOwner(input: CreateShareInput): Promise<OwnerShareCreatedView> {
+        const created = await this.createShare(input);
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+        if (!vaultItem) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        return {
+            ...this.toOwnerMetadataView(created.share as ShareLinkRecord, vaultItem, input.now ?? Date.now(), created.share.publicUrl),
+            rawToken: created.rawToken,
+            rawAccessCode: created.rawAccessCode,
+        };
+    }
+
+    async listSharesForOwner(ownerId: string, now = Date.now()): Promise<OwnerShareMetadataView[]> {
+        const shares = await this.shareRepository.listForOwner(ownerId);
+        const views: OwnerShareMetadataView[] = [];
+
+        for (const share of shares) {
+            const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+            if (!vaultItem) {
+                continue;
+            }
+
+            views.push(this.toOwnerMetadataView(share as ShareLinkRecord, vaultItem, now));
+        }
+
+        return views;
+    }
+
+    async getShareForOwner(ownerId: string, shareId: string, now = Date.now()): Promise<OwnerShareMetadataView> {
+        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+        if (!share) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+        if (!vaultItem) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        return this.toOwnerMetadataView(share as ShareLinkRecord, vaultItem, now);
+    }
+
+    async revokeShareForOwner(ownerId: string, shareId: string, now = Date.now()): Promise<OwnerShareMetadataView> {
+        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+        if (!share) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+        if (!vaultItem) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
+        if (!revoked) {
+            throw new AppError('share_item_inaccessible', 404);
+        }
+
+        const revokedShare = {
+            ...(share as ShareLinkRecord),
+            revokedAt: now,
+        };
+
+        return this.toOwnerMetadataView(revokedShare, vaultItem, now);
+    }
+
     async revokeShare(ownerId: string, shareId: string, now = Date.now()): Promise<void> {
         const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
         if (!revoked) {
@@ -173,6 +265,28 @@ export class ShareService {
             return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
+        const decryptedSecret = await decryptField(vaultItem.secret, this.env.ENCRYPTION_KEY || this.env.JWT_SECRET || '');
+        const period = Number(vaultItem.period || 30);
+        const remainingSeconds = period - (Math.floor(now / 1000) % period);
+        const itemView = {
+            service: vaultItem.service,
+            account: vaultItem.account,
+            ...(typeof decryptedSecret === 'string' && decryptedSecret ? {
+                otp: {
+                    code: await generate(
+                        decryptedSecret,
+                        period,
+                        Number(vaultItem.digits || 6),
+                        vaultItem.algorithm || 'SHA1',
+                        vaultItem.type || 'totp',
+                        now,
+                    ),
+                    period,
+                    remainingSeconds,
+                },
+            } : {}),
+        };
+
         const accessCode = input.accessCode || '';
         const accessCodeOk = await verifyShareSecret(pepper, 'share-access-code', accessCode, share.accessCodeHash);
         if (!accessCodeOk) {
@@ -199,10 +313,7 @@ export class ShareService {
             accessible: true,
             status: 'active',
             share: null,
-            itemView: {
-                service: vaultItem.service,
-                account: vaultItem.account,
-            },
+            itemView,
             publicHeaders,
         };
     }
