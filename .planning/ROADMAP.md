@@ -28,7 +28,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Maintainer has a written security contract covering token/code handling, expiration, revocation, TOTP disclosure, logging, cache/referrer protections, canonical public origin, and UI/API-only scope.
   4. System can persist each share link for exactly one owner-accessible vault/account item while storing raw share URL tokens and access codes only as hashes or derived values after creation.
   5. Expiration, revocation, deleted-item checks, audit events, and fail-closed share-specific rate limiting are enforced in service/repository logic before route behavior depends on them.
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 01-01-PLAN.md — Restore editable backend source, provenance, backend lockfile, and reproducible target build scripts.
+- [ ] 01-02-PLAN.md — Define share-link security contract, domain types, and token/access-code security primitives.
+- [ ] 01-03-PLAN.md — Add durable share schema, repository/service enforcement, audit, and fail-closed rate limiting.
+- [ ] 01-04-PLAN.md — Run blocking schema/migration/test/build alignment validation across backend targets.
 **UI hint**: yes
 
 ### Phase 2: Share Link API
