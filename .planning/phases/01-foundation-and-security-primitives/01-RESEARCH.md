@@ -337,27 +337,24 @@ Final column names should be mirrored in MySQL/PostgreSQL schema files and migra
 | A2 | A keyed HMAC should be preferred over simple peppered SHA-256 if restored runtime utilities make it ergonomic across Workers/Node. | Code Examples | Weak token-hash design could reduce protection if DB leaks. |
 | A3 | Default max expiration should be short and bounded, but the exact max duration is not locked by current requirements. | Security Domain / Open Questions | Planner needs user/product decision before hardcoding policy. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Where is the authoritative editable source?**
-   - What we know: Current checkout lacks `src/**`, `backend/scripts/**`, `tsconfig.json`, frontend source, and tests. [VERIFIED: `rg --files`]
-   - What's unclear: Whether source should be restored from upstream NodeAuth, reconstructed from source maps, or provided by another checkout.
-   - Recommendation: Planner should make source restoration/provenance the first plan and block share feature implementation until resolved.
+   - Resolution: Plan 01-01 restored editable backend source to `src/**` from source maps, added `tsconfig.json`, backend build scripts, `backend/package-lock.json`, and `.planning/source-provenance.md`.
+   - Current rule: `src/**` is the primary backend implementation surface; `backend/dist/**` is regenerated output and must not be hand-patched for feature work.
+   - Frontend remains distribution-only: editable frontend source is absent, so Phase 1 stays API-only.
 
 2. **What is the canonical public origin variable?**
-   - What we know: Existing env bindings include many OAuth redirect URIs but no obvious `PUBLIC_ORIGIN`, `APP_URL`, or share base URL setting. [VERIFIED: `rg` env/origin search]
-   - What's unclear: Whether share URLs should derive from incoming request origin, a new required env var, or deployment-specific config.
-   - Recommendation: Add an explicit `NODEAUTH_PUBLIC_ORIGIN` or similarly named env field to the security contract unless the user chooses request-origin derivation.
+   - Resolution: Plan 01-02 added optional `NODEAUTH_PUBLIC_ORIGIN?: string` to `EnvBindings` and documented it in `docs/share-link-security-contract.md`.
+   - Current rule: Share URL construction uses `NODEAUTH_PUBLIC_ORIGIN` when set; otherwise request origin is accepted only for `https://` or localhost origins.
 
 3. **What expiration policy is acceptable for v1?**
-   - What we know: Expiration is required and must be bounded. [VERIFIED: requirements]
-   - What's unclear: Default/max duration.
-   - Recommendation: Planner should require a configurable default and maximum with conservative defaults; exact numbers need confirmation. [ASSUMED]
+   - Resolution: Plan 01-02 locked `SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60` and `SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60`.
+   - Current rule: The security contract states default TTL is `86400` seconds and maximum TTL is `604800` seconds, with optional env bindings for share TTL configuration.
 
 4. **Can source-level tests be restored before share primitives?**
-   - What we know: `vitest run` is declared but no tests/config/dependencies are present. [VERIFIED: `backend/package.json`, `.planning/codebase/TESTING.md`]
-   - What's unclear: Whether test harness exists upstream.
-   - Recommendation: Include a test-harness restoration task in Wave 0.
+   - Resolution: Plans 01-02 and 01-03 added `backend/vitest.config.ts` and focused source-level Vitest tests under `src/**`.
+   - Current rule: Use `npm --prefix backend test` for the restored backend test harness; Plan 01-04 recorded full validation evidence with 3 test files and 16 tests passing.
 
 ## Environment Availability
 
