@@ -48,6 +48,13 @@ const expectRecipientSafeDecision = (decision: any) => {
     });
 };
 
+const expectSafeAuditEvent = (auditEvent: any, forbiddenValues: string[]) => {
+    const serialized = JSON.stringify(auditEvent);
+    for (const value of forbiddenValues) {
+        expect(serialized).not.toContain(value);
+    }
+};
+
 describe('ShareService', () => {
     let vaultRepository: any;
     let shareRepository: any;
@@ -240,13 +247,14 @@ describe('ShareService', () => {
     it('serializes successful decisions with public headers and no internal share fields', async () => {
         const accessCode = 'correct-code';
         const accessCodeHash = await hashShareSecret('pepper', 'share-access-code', accessCode);
-        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ accessCodeHash }));
+        const rawToken = 'raw-public-token-123';
+        const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ tokenHash, accessCodeHash }));
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
 
         const decision = await service.resolveShareAccess({
-            token: 'token',
+            token: rawToken,
             accessCode,
-            requestOrigin: 'https://example.com',
             now: 1000,
         } as any);
 
@@ -258,7 +266,90 @@ describe('ShareService', () => {
                 account: 'user@example.com',
             },
         });
+        expect(shareRepository.findByTokenHash).toHaveBeenCalledWith(tokenHash);
         expectRecipientSafeDecision(decision);
+        expect(vaultRepository.findActiveByIdForOwner).toHaveBeenCalledWith('vault-1', 'owner-1');
+        expect(shareRepository.markAccessed).toHaveBeenCalledWith('share-1', 1000);
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            shareId: 'share-1',
+            eventType: 'access_granted',
+            actorType: 'recipient',
+            eventAt: 1000,
+            ownerId: 'owner-1',
+            ipHash: null,
+            userAgentHash: null,
+        }));
+        const accessAuditEvent = shareRepository.insertAuditEvent.mock.calls[shareRepository.insertAuditEvent.mock.calls.length - 1]?.[0];
+        expectSafeAuditEvent(accessAuditEvent, [
+            rawToken,
+            accessCode,
+            'password',
+            'seed',
+            'otpauth',
+            'http://',
+            'https://',
+            'publicUrl',
+            'fullUrl',
+            'accessCode',
+            'token',
+        ]);
+        expect(accessAuditEvent.metadata).toBe(JSON.stringify({
+            accessedAt: 1000,
+            status: 'active',
+        }));
+    });
+
+    it('records an expired audit event before returning an inaccessible expired decision', async () => {
+        const rawToken = 'raw-public-token-123';
+        const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({
+            tokenHash,
+            expiresAt: 999,
+        }));
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({
+            accessible: false,
+            status: 'expired',
+            reason: 'inaccessible',
+            share: null,
+            itemView: null,
+        });
+        expect(shareRepository.findByTokenHash).toHaveBeenCalledWith(tokenHash);
+        expect(vaultRepository.findActiveByIdForOwner).not.toHaveBeenCalled();
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            shareId: 'share-1',
+            eventType: 'expired',
+            actorType: 'system',
+            eventAt: 1000,
+            ownerId: 'owner-1',
+            ipHash: null,
+            userAgentHash: null,
+        }));
+        const expiredAuditEvent = shareRepository.insertAuditEvent.mock.calls[shareRepository.insertAuditEvent.mock.calls.length - 1]?.[0];
+        expectSafeAuditEvent(expiredAuditEvent, [
+            rawToken,
+            'correct-code',
+            'password',
+            'seed',
+            'otpauth',
+            'http://',
+            'https://',
+            'publicUrl',
+            'fullUrl',
+            'accessCode',
+            'token',
+        ]);
+        expect(expiredAuditEvent.metadata).toBe(JSON.stringify({
+            expiredAt: 1000,
+            expiresAt: 999,
+            status: 'expired',
+        }));
     });
 
     it('revokes a share and records a safe audit event', async () => {
