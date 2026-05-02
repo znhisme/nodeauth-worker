@@ -3,19 +3,29 @@ import { AppError } from '@/app/config';
 import { shareRateLimit } from '@/shared/middleware/shareRateLimitMiddleware';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
 
-const makeContext = (overrides: any = {}) => ({
-    env: {
+const makeContext = (overrides: any = {}) => {
+    const defaultEnv = {
         DB: {},
         SHARE_SECRET_PEPPER: 'pepper',
         JWT_SECRET: 'jwt',
-    },
-    req: {
+    };
+    return {
+        env: {
+            ...defaultEnv,
+            ...(overrides.env || {}),
+        },
+        req: {
         header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
         path: '/share/token',
         param: vi.fn((name: string) => (name === 'token' ? 'token-1' : undefined)),
-    },
-    ...overrides,
-});
+        },
+        ...overrides,
+        env: {
+            ...defaultEnv,
+            ...(overrides.env || {}),
+        },
+    };
+};
 
 describe('shareRateLimit', () => {
     afterEach(() => {
@@ -24,7 +34,7 @@ describe('shareRateLimit', () => {
 
     it('throws share_inaccessible when DB is missing', async () => {
         const middleware = shareRateLimit();
-        const ctx = makeContext({ env: {} });
+        const ctx = makeContext({ env: { DB: undefined } });
         await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ name: 'AppError', message: 'share_inaccessible', statusCode: 404 });
     });
 

@@ -35,6 +35,13 @@ export interface ShareLinkRecord {
     publicUrl?: string;
 }
 
+export interface SharePublicAccessRecord {
+    status: ShareStatus;
+    expiresAt: string;
+    revokedAt?: string | null;
+    createdAt: string;
+}
+
 export interface ShareAuditEvent {
     id: string;
     shareId: string;
@@ -87,7 +94,7 @@ export interface ShareAccessDecision {
     accessible: boolean;
     status: ShareStatus;
     reason?: 'inaccessible';
-    share?: ShareLinkRecord | null;
+    share?: SharePublicAccessRecord | null;
     publicHeaders?: Record<string, string>;
     publicUrl?: string;
     itemView?: SharedItemView | null;

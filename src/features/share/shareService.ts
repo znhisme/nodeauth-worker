@@ -6,6 +6,7 @@ import {
     clampShareTtlSeconds,
     generateAccessCode,
     generateShareToken,
+    getSharePublicHeaders,
     getShareSecretPepper,
     hashShareSecret,
     verifyShareSecret,
@@ -133,41 +134,42 @@ export class ShareService {
     async resolveShareAccess(input: ResolveShareAccessInput): Promise<ShareAccessDecision> {
         const now = input.now ?? Date.now();
         const pepper = getShareSecretPepper(this.env);
+        const publicHeaders = getSharePublicHeaders();
         const tokenHash = await hashShareSecret(pepper, 'share-token', input.token);
         const share = await this.shareRepository.findByTokenHash(tokenHash);
 
         if (!share) {
-            return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null };
+            return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
         if (share.revokedAt !== null && share.revokedAt !== undefined) {
-            return { accessible: false, status: 'revoked', reason: 'inaccessible', share, itemView: null };
+            return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
         if (share.expiresAt <= now) {
-            return { accessible: false, status: 'expired', reason: 'inaccessible', share, itemView: null };
+            return { accessible: false, status: 'expired', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
         const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId);
         if (!vaultItem) {
-            return { accessible: false, status: 'revoked', reason: 'inaccessible', share, itemView: null };
+            return { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
         const accessCode = input.accessCode || '';
         const accessCodeOk = await verifyShareSecret(pepper, 'share-access-code', accessCode, share.accessCodeHash);
         if (!accessCodeOk) {
-            return { accessible: false, status: 'active', reason: 'inaccessible', share, itemView: null };
+            return { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null, publicHeaders };
         }
 
         return {
             accessible: true,
             status: 'active',
-            share,
+            share: null,
             itemView: {
                 service: vaultItem.service,
                 account: vaultItem.account,
             },
-            publicHeaders: undefined,
+            publicHeaders,
             publicUrl: input.requestOrigin ? buildShareUrl(input.requestOrigin, input.token) : undefined,
         };
     }
