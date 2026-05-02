@@ -15,6 +15,7 @@ deno.lock
 
 # 3. Build & Temp (Netlify Local Dev)
 .netlify/
+.vercel/
 .functions-serve/
 npm-debug.log*
 

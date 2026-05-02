@@ -1,0 +1,66 @@
+# 1. Environment & Secrets (STRICT - DO NOT COMMIT)
+.env
+.env.*
+.secrets
+.dev.vars
+.demo.vars
+.actrc
+.event
+deno.lock
+*.pem
+*.key
+*.cert
+
+# 2. Dependencies
+api/index.mjs*
+**/node_modules/
+backend/dist/docker/
+backend/dist/vercel/
+backend/dist/worker/
+backend/tests/
+backend/tsup.config.ts
+backend/vitest.config.ts
+frontend/playwright-report/
+frontend/tests/
+frontend/playwright.config.js
+
+# 3. Build & Temp (Netlify Local Dev)
+.dist/
+.git/
+.github/
+.netlify/
+.security/
+.vercel/
+.wrangler/
+.functions-serve/
+npm-debug.log*
+
+# 4. Database & Local Data
+data/
+*.db
+*.db-journal
+*.db-wal
+**/*.db*
+
+# 5. Developer Tools & IDEs
+.DS_Store
+.vscode/
+.idea/
+
+# 6. Agentic AI & Local Scripts
+.antigravity
+.gemini/
+.agent/
+.agents/
+.act/
+.example/
+.actrc
+.event
+.dockerignore
+.gitignore
+.docker-compose*.yml
+Dockerfile
+example.dev.vars
+vercel.json
+README*.md
+wrangler*.toml

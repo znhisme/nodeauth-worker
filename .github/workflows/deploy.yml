@@ -108,7 +108,7 @@ jobs:
           printf "\n[[d1_databases]]\nbinding = \"DB\"\ndatabase_name = \"$CLOUDFLARE_D1_DATABASE_NAME\"\ndatabase_id = \"$CLOUDFLARE_D1_DATABASE_ID\"\n" >> wrangler.toml
 
       - name: Sync Database Schema
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -183,7 +183,7 @@ jobs:
           fi
 
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
