@@ -91,32 +91,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FND-01 | Phase 1 | Pending |
 | FND-02 | Phase 1 | Pending |
 | FND-03 | Phase 1 | Pending |
-| STATE-01 | Phase 2 | Pending |
-| STATE-02 | Phase 2 | Pending |
-| STATE-03 | Phase 2 | Pending |
-| STATE-04 | Phase 2 | Pending |
-| STATE-05 | Phase 2 | Pending |
-| OWN-01 | Phase 3 | Pending |
-| OWN-02 | Phase 3 | Pending |
-| OWN-03 | Phase 3 | Pending |
-| OWN-04 | Phase 3 | Pending |
-| OWN-05 | Phase 3 | Pending |
-| OWN-06 | Phase 3 | Pending |
-| OWN-07 | Phase 3 | Pending |
-| REC-01 | Phase 4 | Pending |
-| REC-02 | Phase 4 | Pending |
-| REC-03 | Phase 4 | Pending |
-| REC-04 | Phase 4 | Pending |
-| REC-05 | Phase 4 | Pending |
-| REC-06 | Phase 4 | Pending |
-| UX-01 | Phase 5 | Pending |
-| UX-02 | Phase 3 | Pending |
-| UX-03 | Phase 5 | Pending |
+| STATE-01 | Phase 1 | Pending |
+| STATE-02 | Phase 1 | Pending |
+| STATE-03 | Phase 1 | Pending |
+| STATE-04 | Phase 1 | Pending |
+| STATE-05 | Phase 1 | Pending |
+| OWN-01 | Phase 2 | Pending |
+| OWN-02 | Phase 2 | Pending |
+| OWN-03 | Phase 2 | Pending |
+| OWN-04 | Phase 2 | Pending |
+| OWN-05 | Phase 2 | Pending |
+| OWN-06 | Phase 2 | Pending |
+| OWN-07 | Phase 2 | Pending |
+| REC-01 | Phase 2 | Pending |
+| REC-02 | Phase 2 | Pending |
+| REC-03 | Phase 2 | Pending |
+| REC-04 | Phase 2 | Pending |
+| REC-05 | Phase 2 | Pending |
+| REC-06 | Phase 2 | Pending |
+| UX-01 | Phase 3 | Pending |
+| UX-02 | Phase 2 | Pending |
+| UX-03 | Phase 3 | Pending |
 | UX-04 | Phase 1 | Pending |
-| HARD-01 | Phase 6 | Pending |
-| HARD-02 | Phase 6 | Pending |
-| HARD-03 | Phase 6 | Pending |
-| HARD-04 | Phase 6 | Pending |
+| HARD-01 | Phase 3 | Pending |
+| HARD-02 | Phase 3 | Pending |
+| HARD-03 | Phase 3 | Pending |
+| HARD-04 | Phase 3 | Pending |
 
 **Coverage:**
 - v1 requirements: 29 total
@@ -125,4 +125,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-05-02*
-*Last updated: 2026-05-02 after roadmap creation*
+*Last updated: 2026-05-02 after consolidating roadmap to 3 phases*

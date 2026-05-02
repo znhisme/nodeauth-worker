@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-05-02)
 
 **Core value:** A NodeAuth user can create a safe, revocable HTTP link for one account item and a friend can use that link to access only that shared account's login details.
-**Current focus:** Phase 1: Source, Build, and Security Contract
+**Current focus:** Phase 1: Foundation and Security Primitives
 
 ## Current Position
 
-Phase: 1 of 6 (Source, Build, and Security Contract)
+Phase: 1 of 3 (Foundation and Security Primitives)
 Plan: TBD of TBD in current phase
 Status: Ready to plan
-Last activity: 2026-05-02 - Roadmap created and requirements traceability initialized.
+Last activity: 2026-05-02 - Roadmap consolidated from 6 phases to 3 phases and requirements traceability updated.
 
 Progress: [----------] 0%
 
@@ -42,7 +42,7 @@ Progress: [----------] 0%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Roadmap]: Keep six phases despite coarse granularity because source provenance, primitives, owner API, public API, cleanup/UX, and hardening each gate different security risks.
+- [Roadmap]: Consolidated the milestone into three phases because this is one feature; security requirements remain covered inside broader delivery phases.
 - [Phase 1]: Do not hand-patch generated `backend/dist/**` bundles as the primary implementation path for share links.
 - [Milestone]: Require independent access code by default and limit v1 sharing to one vault/account item per link.
 
@@ -54,8 +54,8 @@ None yet.
 
 - [Phase 1]: Current checkout appears distribution-oriented; editable backend/frontend source and build scripts must be confirmed or restored.
 - [Phase 1]: Backend dependency lockfile and test harness availability need verification before security-sensitive implementation.
-- [Phase 2]: Existing rate limiting is documented as fail-open on database errors; share access must fail closed.
-- [Phase 4]: Recipient DTO and TOTP current-code behavior need codebase-specific vault/crypto investigation.
+- [Phase 1]: Existing rate limiting is documented as fail-open on database errors; share access must fail closed.
+- [Phase 2]: Recipient DTO and TOTP current-code behavior need codebase-specific vault/crypto investigation.
 
 ## Deferred Items
 
@@ -68,5 +68,5 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-05-02 00:00
-Stopped at: Roadmap and state initialized; next step is `/gsd-plan-phase 1`.
+Stopped at: Roadmap consolidated to 3 phases; next step is `/gsd-plan-phase 1`.
 Resume file: None
