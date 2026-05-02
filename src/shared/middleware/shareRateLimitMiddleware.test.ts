@@ -53,6 +53,9 @@ const expectShareInaccessibleResponse = async (response: Response) => {
     for (const [name, value] of Object.entries(getSharePublicHeaders())) {
         expect(response.headers.get(name)).toBe(value);
     }
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Pragma')).toBe('no-cache');
+    expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
 };
 
 describe('shareRateLimit', () => {

@@ -1,12 +1,12 @@
 import { Context, Next } from 'hono';
-import { AppError, type EnvBindings } from '@/app/config';
+import { type EnvBindings } from '@/app/config';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
 import {
     SHARE_RATE_LIMIT_LOCK_MS,
     SHARE_RATE_LIMIT_MAX_ATTEMPTS,
     SHARE_RATE_LIMIT_WINDOW_MS,
 } from '@/features/share/shareTypes';
-import { getShareSecretPepper, hashShareSecret } from '@/features/share/shareSecurity';
+import { getSharePublicHeaders, getShareSecretPepper, hashShareSecret } from '@/features/share/shareSecurity';
 import { logger } from '@/shared/utils/logger';
 
 function createId(prefix: string): string {
@@ -17,12 +17,20 @@ function toMetadata(value: Record<string, unknown>): string {
     return JSON.stringify(value);
 }
 
+function returnShareInaccessible(c: Context<{ Bindings: EnvBindings }>) {
+    for (const [name, value] of Object.entries(getSharePublicHeaders())) {
+        c.header(name, value);
+    }
+
+    return c.json({ success: false, message: 'share_inaccessible', data: null }, 404);
+}
+
 export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }) => {
     return async (c: Context<{ Bindings: EnvBindings }>, next: Next) => {
         const db = c.env.DB;
         if (!db) {
             logger.warn('[ShareRateLimit] access blocked');
-            throw new AppError('share_inaccessible', 404);
+            return returnShareInaccessible(c);
         }
 
         try {
@@ -66,11 +74,11 @@ export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }
                     });
                 }
                 logger.warn('[ShareRateLimit] access blocked');
-                throw new AppError('share_inaccessible', 404);
+                return returnShareInaccessible(c);
             }
         } catch {
             logger.warn('[ShareRateLimit] access blocked');
-            throw new AppError('share_inaccessible', 404);
+            return returnShareInaccessible(c);
         }
 
         await next();

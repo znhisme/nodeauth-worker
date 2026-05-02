@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { EnvBindings } from '@/app/config';
 import { authMiddleware } from '@/shared/middleware/auth';
 import { createShareService } from '@/features/share/shareService';
+import { getSharePublicHeaders } from '@/features/share/shareSecurity';
+import { shareRateLimit } from '@/shared/middleware/shareRateLimitMiddleware';
 
 const share = new Hono<{ Bindings: EnvBindings, Variables: { user: any } }>();
 
@@ -54,6 +56,28 @@ share.delete('/:id', authMiddleware, async (c) => {
     const share = await service.revokeShareForOwner(ownerId, c.req.param('id'));
 
     return c.json({ success: true, share, message: 'Share link revoked' });
+});
+
+share.post('/public/:token/access', shareRateLimit(), async (c) => {
+    const token = c.req.param('token');
+    const body = await c.req.json().catch(() => ({}));
+    const accessCode = typeof body.accessCode === 'string' ? body.accessCode : undefined;
+    const service = getService(c);
+    const decision = await service.resolveShareAccess({
+        token,
+        accessCode,
+        requestOrigin: new URL(c.req.url).origin,
+    });
+
+    for (const [name, value] of Object.entries(decision.publicHeaders || getSharePublicHeaders())) {
+        c.header(name, value);
+    }
+
+    if (!decision.accessible) {
+        return c.json({ success: false, message: 'share_inaccessible', data: null }, 404);
+    }
+
+    return c.json({ success: true, data: decision.itemView });
 });
 
 export default share;

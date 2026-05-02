@@ -19,9 +19,10 @@ const mocks = vi.hoisted(() => {
         revokeShareForOwner,
         resolveShareAccess,
     }));
-    const shareRateLimit = vi.fn(() => async (_c: any, next: any) => {
+    const shareRateLimitMiddleware = vi.fn(async (_c: any, next: any) => {
         await next();
     });
+    const shareRateLimit = vi.fn(() => shareRateLimitMiddleware);
 
     return {
         authMiddleware,
@@ -31,6 +32,7 @@ const mocks = vi.hoisted(() => {
         revokeShareForOwner,
         resolveShareAccess,
         createShareService,
+        shareRateLimitMiddleware,
         shareRateLimit,
     };
 });
@@ -261,7 +263,7 @@ describe('Share link routes', () => {
             },
         });
         expect(mocks.authMiddleware).not.toHaveBeenCalled();
-        expect(mocks.shareRateLimit).toHaveBeenCalledTimes(1);
+        expect(mocks.shareRateLimitMiddleware).toHaveBeenCalledTimes(1);
         expect(mocks.resolveShareAccess).toHaveBeenCalledWith({
             token: 'raw-token-123',
             accessCode: 'code-123',
