@@ -1,9 +1,9 @@
 # Source Provenance
 
 Source maps used
-- backend/dist/worker/worker.js.map (64 src entries)
-- backend/dist/docker/server.js.map (68 src entries)
-- backend/dist/netlify/api.mjs.map (67 src entries)
+- backend/dist/worker/worker.js.map (70 src entries)
+- backend/dist/docker/server.js.map (74 src entries)
+- backend/dist/netlify/api.mjs.map (73 src entries)
 
 Editable backend source: restored to src/**
 
@@ -49,6 +49,10 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/features/backup/providers/webDavProvider.ts
 - src/features/emergency/emergencyRoutes.ts
 - src/features/health/healthRoutes.ts
+- src/features/share/sharePrimitives.ts
+- src/features/share/shareSecurity.ts
+- src/features/share/shareService.ts
+- src/features/share/shareTypes.ts
 - src/features/telegram/telegramRoutes.ts
 - src/features/tools/toolsRoutes.ts
 - src/features/vault/trashService.ts
@@ -65,6 +69,7 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/shared/db/repositories/backupRepository.ts
 - src/shared/db/repositories/emergencyRepository.ts
 - src/shared/db/repositories/sessionRepository.ts
+- src/shared/db/repositories/shareRepository.ts
 - src/shared/db/repositories/vaultRepository.ts
 - src/shared/db/schema/index.ts
 - src/shared/db/schema/mysql.ts
@@ -73,6 +78,7 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/shared/db/sqliteExecutor.ts
 - src/shared/middleware/auth.ts
 - src/shared/middleware/rateLimitMiddleware.ts
+- src/shared/middleware/shareRateLimitMiddleware.ts
 - src/shared/utils/common.ts
 - src/shared/utils/crypto.ts
 - src/shared/utils/health.ts

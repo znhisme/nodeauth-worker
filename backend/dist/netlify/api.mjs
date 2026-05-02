@@ -889,6 +889,9 @@ __export(sqlite_exports, {
   backupTelegramHistory: () => backupTelegramHistory,
   rateLimits: () => rateLimits,
   schemaMetadata: () => schemaMetadata,
+  shareAuditEvents: () => shareAuditEvents,
+  shareLinks: () => shareLinks,
+  shareRateLimits: () => shareRateLimits,
   vault: () => vault
 });
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
@@ -912,6 +915,37 @@ var vault = sqliteTable("vault", {
   updatedBy: text("updated_by"),
   sortOrder: integer("sort_order").default(0),
   deletedAt: integer("deleted_at")
+});
+var shareLinks = sqliteTable("share_links", {
+  id: text("id").primaryKey(),
+  vaultItemId: text("vault_item_id").notNull(),
+  ownerId: text("owner_id").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  accessCodeHash: text("access_code_hash").notNull(),
+  expiresAt: integer("expires_at").notNull(),
+  revokedAt: integer("revoked_at"),
+  createdAt: integer("created_at").notNull(),
+  lastAccessedAt: integer("last_accessed_at"),
+  accessCount: integer("access_count").notNull().default(0)
+});
+var shareAuditEvents = sqliteTable("share_audit_events", {
+  id: text("id").primaryKey(),
+  shareId: text("share_id").notNull(),
+  eventType: text("event_type").notNull(),
+  actorType: text("actor_type").notNull(),
+  eventAt: integer("event_at").notNull(),
+  ownerId: text("owner_id").notNull(),
+  ipHash: text("ip_hash"),
+  userAgentHash: text("user_agent_hash"),
+  metadata: text("metadata")
+});
+var shareRateLimits = sqliteTable("share_rate_limits", {
+  key: text("key").primaryKey(),
+  shareId: text("share_id").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  windowStartedAt: integer("window_started_at").notNull(),
+  lastAttemptAt: integer("last_attempt_at").notNull(),
+  lockedUntil: integer("locked_until")
 });
 var backupProviders = sqliteTable("backup_providers", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -1002,6 +1036,9 @@ __export(mysql_exports, {
   backupTelegramHistory: () => backupTelegramHistory2,
   rateLimits: () => rateLimits2,
   schemaMetadata: () => schemaMetadata2,
+  shareAuditEvents: () => shareAuditEvents2,
+  shareLinks: () => shareLinks2,
+  shareRateLimits: () => shareRateLimits2,
   vault: () => vault2
 });
 import { mysqlTable, varchar, int, boolean, longtext, bigint } from "drizzle-orm/mysql-core";
@@ -1022,6 +1059,37 @@ var vault2 = mysqlTable("vault", {
   updatedBy: varchar("updated_by", { length: 255 }),
   sortOrder: bigint("sort_order", { mode: "number" }).default(0),
   deletedAt: bigint("deleted_at", { mode: "number" })
+});
+var shareLinks2 = mysqlTable("share_links", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  vaultItemId: varchar("vault_item_id", { length: 36 }).notNull(),
+  ownerId: varchar("owner_id", { length: 255 }).notNull(),
+  tokenHash: varchar("token_hash", { length: 255 }).notNull(),
+  accessCodeHash: varchar("access_code_hash", { length: 255 }).notNull(),
+  expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
+  revokedAt: bigint("revoked_at", { mode: "number" }),
+  createdAt: bigint("created_at", { mode: "number" }).notNull(),
+  lastAccessedAt: bigint("last_accessed_at", { mode: "number" }),
+  accessCount: bigint("access_count", { mode: "number" }).notNull().default(0)
+});
+var shareAuditEvents2 = mysqlTable("share_audit_events", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  shareId: varchar("share_id", { length: 36 }).notNull(),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
+  actorType: varchar("actor_type", { length: 50 }).notNull(),
+  eventAt: bigint("event_at", { mode: "number" }).notNull(),
+  ownerId: varchar("owner_id", { length: 255 }).notNull(),
+  ipHash: varchar("ip_hash", { length: 255 }),
+  userAgentHash: varchar("user_agent_hash", { length: 255 }),
+  metadata: longtext("metadata")
+});
+var shareRateLimits2 = mysqlTable("share_rate_limits", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  shareId: varchar("share_id", { length: 36 }).notNull(),
+  attempts: bigint("attempts", { mode: "number" }).notNull().default(0),
+  windowStartedAt: bigint("window_started_at", { mode: "number" }).notNull(),
+  lastAttemptAt: bigint("last_attempt_at", { mode: "number" }).notNull(),
+  lockedUntil: bigint("locked_until", { mode: "number" })
 });
 var backupProviders2 = mysqlTable("backup_providers", {
   id: int("id").primaryKey().autoincrement(),
@@ -1095,6 +1163,9 @@ __export(pg_exports, {
   backupTelegramHistory: () => backupTelegramHistory3,
   rateLimits: () => rateLimits3,
   schemaMetadata: () => schemaMetadata3,
+  shareAuditEvents: () => shareAuditEvents3,
+  shareLinks: () => shareLinks3,
+  shareRateLimits: () => shareRateLimits3,
   vault: () => vault3
 });
 import { pgTable, varchar as varchar2, integer as integer2, boolean as boolean2, text as text2, serial, bigint as bigint2 } from "drizzle-orm/pg-core";
@@ -1115,6 +1186,37 @@ var vault3 = pgTable("vault", {
   updatedBy: varchar2("updated_by"),
   sortOrder: bigint2("sort_order", { mode: "number" }).default(0),
   deletedAt: bigint2("deleted_at", { mode: "number" })
+});
+var shareLinks3 = pgTable("share_links", {
+  id: varchar2("id").primaryKey(),
+  vaultItemId: varchar2("vault_item_id").notNull(),
+  ownerId: varchar2("owner_id").notNull(),
+  tokenHash: varchar2("token_hash").notNull(),
+  accessCodeHash: varchar2("access_code_hash").notNull(),
+  expiresAt: bigint2("expires_at", { mode: "number" }).notNull(),
+  revokedAt: bigint2("revoked_at", { mode: "number" }),
+  createdAt: bigint2("created_at", { mode: "number" }).notNull(),
+  lastAccessedAt: bigint2("last_accessed_at", { mode: "number" }),
+  accessCount: bigint2("access_count", { mode: "number" }).notNull().default(0)
+});
+var shareAuditEvents3 = pgTable("share_audit_events", {
+  id: varchar2("id").primaryKey(),
+  shareId: varchar2("share_id").notNull(),
+  eventType: varchar2("event_type").notNull(),
+  actorType: varchar2("actor_type").notNull(),
+  eventAt: bigint2("event_at", { mode: "number" }).notNull(),
+  ownerId: varchar2("owner_id").notNull(),
+  ipHash: varchar2("ip_hash"),
+  userAgentHash: varchar2("user_agent_hash"),
+  metadata: text2("metadata")
+});
+var shareRateLimits3 = pgTable("share_rate_limits", {
+  key: varchar2("key").primaryKey(),
+  shareId: varchar2("share_id").notNull(),
+  attempts: bigint2("attempts", { mode: "number" }).notNull().default(0),
+  windowStartedAt: bigint2("window_started_at", { mode: "number" }).notNull(),
+  lastAttemptAt: bigint2("last_attempt_at", { mode: "number" }).notNull(),
+  lockedUntil: bigint2("locked_until", { mode: "number" })
 });
 var backupProviders3 = pgTable("backup_providers", {
   id: serial("id").primaryKey(),
@@ -1187,6 +1289,9 @@ var backupEmailHistory4;
 var authPasskeys4;
 var authSessions4;
 var rateLimits4;
+var shareLinks4;
+var shareAuditEvents4;
+var shareRateLimits4;
 var schemaMetadata4;
 if (engine === "mysql") {
   vault4 = vault2;
@@ -1196,6 +1301,9 @@ if (engine === "mysql") {
   authPasskeys4 = authPasskeys2;
   authSessions4 = authSessions2;
   rateLimits4 = rateLimits2;
+  shareLinks4 = shareLinks2;
+  shareAuditEvents4 = shareAuditEvents2;
+  shareRateLimits4 = shareRateLimits2;
   schemaMetadata4 = schemaMetadata2;
 } else if (engine === "postgres" || engine === "postgresql") {
   vault4 = vault3;
@@ -1205,6 +1313,9 @@ if (engine === "mysql") {
   authPasskeys4 = authPasskeys3;
   authSessions4 = authSessions3;
   rateLimits4 = rateLimits3;
+  shareLinks4 = shareLinks3;
+  shareAuditEvents4 = shareAuditEvents3;
+  shareRateLimits4 = shareRateLimits3;
   schemaMetadata4 = schemaMetadata3;
 } else {
   vault4 = vault;
@@ -1214,6 +1325,9 @@ if (engine === "mysql") {
   authPasskeys4 = authPasskeys;
   authSessions4 = authSessions;
   rateLimits4 = rateLimits;
+  shareLinks4 = shareLinks;
+  shareAuditEvents4 = shareAuditEvents;
+  shareRateLimits4 = shareRateLimits;
   schemaMetadata4 = schemaMetadata;
 }
 
@@ -3919,6 +4033,19 @@ var VaultRepository = class {
   async findById(id) {
     const result = await this.db.select().from(vault4).where(eq5(vault4.id, id)).limit(1);
     return result[0];
+  }
+  /**
+   * 获取 owner 可访问且未删除的单个 item
+   */
+  async findActiveByIdForOwner(id, ownerId) {
+    const result = await this.db.select().from(vault4).where(
+      and2(
+        eq5(vault4.id, id),
+        isNull(vault4.deletedAt),
+        or(isNull(vault4.createdBy), eq5(vault4.createdBy, ownerId))
+      )
+    ).limit(1);
+    return result[0] || null;
   }
   /**
    * 根据 service/account 查找记录 (大小写不敏感，自动 trim)
@@ -7430,8 +7557,360 @@ wcProxy.all("/explorer/*", (c) => {
 });
 var wcProxyRoutes_default = wcProxy;
 
+// ../src/features/share/shareService.ts
+init_config();
+
+// ../src/shared/db/repositories/shareRepository.ts
+import { and as and5, eq as eq10, isNull as isNull2, sql as sql2 } from "drizzle-orm";
+var ShareRepository = class {
+  constructor(db) {
+    this.db = db;
+  }
+  async createShareLink(input) {
+    await this.db.insert(shareLinks4).values(input);
+    return await this.findByIdForOwner(input.id, input.ownerId);
+  }
+  async findByTokenHash(tokenHash) {
+    const result = await this.db.select().from(shareLinks4).where(eq10(shareLinks4.tokenHash, tokenHash)).limit(1);
+    return result[0] || null;
+  }
+  async findByIdForOwner(id, ownerId) {
+    const result = await this.db.select().from(shareLinks4).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId))).limit(1);
+    return result[0] || null;
+  }
+  async revokeForOwner(id, ownerId, revokedAt) {
+    const result = await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
+    return !!result;
+  }
+  async markAccessed(id, accessedAt) {
+    await this.db.update(shareLinks4).set({
+      lastAccessedAt: accessedAt,
+      accessCount: sql2`coalesce(${shareLinks4.accessCount}, 0) + 1`
+    }).where(eq10(shareLinks4.id, id));
+  }
+  async insertAuditEvent(input) {
+    await this.db.insert(shareAuditEvents4).values(input);
+  }
+  async enforceRateLimit(input) {
+    const now = input.now ?? Date.now();
+    const existing = await this.db.select().from(shareRateLimits4).where(eq10(shareRateLimits4.key, input.key)).limit(1);
+    const current = existing[0];
+    if (!current) {
+      await this.db.insert(shareRateLimits4).values({
+        key: input.key,
+        shareId: input.shareId,
+        attempts: 1,
+        windowStartedAt: now,
+        lastAttemptAt: now,
+        lockedUntil: null
+      });
+      return { allowed: true, attempts: 1, lockedUntil: null };
+    }
+    if (current.lockedUntil && current.lockedUntil > now) {
+      return { allowed: false, attempts: current.attempts || 0, lockedUntil: current.lockedUntil };
+    }
+    const windowExpired = now - current.windowStartedAt >= input.windowMs;
+    const attempts = windowExpired ? 1 : (current.attempts || 0) + 1;
+    const lockedUntil = attempts > input.maxAttempts ? now + input.lockMs : null;
+    await this.db.update(shareRateLimits4).set({
+      shareId: input.shareId,
+      attempts,
+      windowStartedAt: windowExpired ? now : current.windowStartedAt,
+      lastAttemptAt: now,
+      lockedUntil
+    }).where(eq10(shareRateLimits4.key, input.key));
+    return {
+      allowed: lockedUntil === null,
+      attempts,
+      lockedUntil
+    };
+  }
+};
+
+// ../src/features/share/shareSecurity.ts
+init_config();
+
+// ../src/features/share/shareTypes.ts
+var SHARE_TOKEN_BYTES = 32;
+var SHARE_ACCESS_CODE_BYTES = 16;
+var SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60;
+var SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+var SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
+var SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
+var SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1e3;
+
+// ../src/features/share/shareSecurity.ts
+var textEncoder = new TextEncoder();
+function encodeBase64Url(bytes) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+function constantTimeEqual(left, right) {
+  const leftBytes = textEncoder.encode(left);
+  const rightBytes = textEncoder.encode(right);
+  const maxLength = Math.max(leftBytes.length, rightBytes.length);
+  let mismatch = leftBytes.length ^ rightBytes.length;
+  for (let index = 0; index < maxLength; index += 1) {
+    const leftByte = leftBytes[index] ?? 0;
+    const rightByte = rightBytes[index] ?? 0;
+    mismatch |= leftByte ^ rightByte;
+  }
+  return mismatch === 0;
+}
+function getRandomBytes(byteLength) {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return bytes;
+}
+function generateShareToken() {
+  return encodeBase64Url(getRandomBytes(SHARE_TOKEN_BYTES));
+}
+function generateAccessCode() {
+  return encodeBase64Url(getRandomBytes(SHARE_ACCESS_CODE_BYTES));
+}
+async function hashShareSecret(pepper, purpose, value) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(pepper),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    textEncoder.encode(`${purpose}:${value}`)
+  );
+  return encodeBase64Url(new Uint8Array(signature));
+}
+async function verifyShareSecret(pepper, purpose, value, hash) {
+  const expectedHash = await hashShareSecret(pepper, purpose, value);
+  return constantTimeEqual(expectedHash, hash);
+}
+function buildShareUrl(publicOrigin, token) {
+  const origin = normalizePublicOrigin(publicOrigin);
+  return new URL(`/share/${token}`, origin).toString();
+}
+function normalizePublicOrigin(publicOrigin) {
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(publicOrigin);
+  } catch {
+    throw new AppError("invalid_public_origin", 500);
+  }
+  const isHttps = parsedUrl.protocol === "https:";
+  const isLocalHttp = parsedUrl.protocol === "http:" && (parsedUrl.hostname === "localhost" || parsedUrl.hostname === "127.0.0.1" || parsedUrl.hostname === "[::1]" || parsedUrl.hostname === "::1");
+  if (!isHttps && !isLocalHttp) {
+    throw new AppError("invalid_public_origin", 500);
+  }
+  return parsedUrl.origin;
+}
+function getShareSecretPepper(env) {
+  if (env.SHARE_SECRET_PEPPER) {
+    return env.SHARE_SECRET_PEPPER;
+  }
+  if (env.JWT_SECRET) {
+    return env.JWT_SECRET;
+  }
+  throw new AppError("missing_share_secret_pepper", 500);
+}
+function clampShareTtlSeconds(ttlSeconds) {
+  if (!Number.isFinite(ttlSeconds)) {
+    return SHARE_DEFAULT_TTL_SECONDS;
+  }
+  const normalized = Math.max(1, Math.floor(ttlSeconds));
+  return Math.min(normalized, SHARE_MAX_TTL_SECONDS);
+}
+
+// ../src/features/share/shareService.ts
+var textEncoder2 = new TextEncoder();
+function createId(prefix) {
+  return `${prefix}-${crypto.randomUUID()}`;
+}
+function toMetadata(value) {
+  return JSON.stringify(value);
+}
+var ShareService = class {
+  constructor(env, vaultRepository, shareRepository) {
+    this.env = env;
+    this.vaultRepository = vaultRepository;
+    this.shareRepository = shareRepository;
+  }
+  async createShare(input) {
+    if (!input.ownerId || !input.vaultItemId) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const now = input.now ?? Date.now();
+    const ttlSeconds = clampShareTtlSeconds(input.ttlSeconds ?? SHARE_DEFAULT_TTL_SECONDS);
+    const expiresAt = input.expiresAt ?? now + ttlSeconds * 1e3;
+    if (expiresAt <= now || expiresAt > now + SHARE_MAX_TTL_SECONDS * 1e3) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+    if (!vaultItem) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    const rawToken = generateShareToken();
+    const rawAccessCode = generateAccessCode();
+    const pepper = getShareSecretPepper(this.env);
+    const tokenHash = await hashShareSecret(pepper, "share-token", rawToken);
+    const accessCodeHash = await hashShareSecret(pepper, "share-access-code", rawAccessCode);
+    const shareId = createId("share");
+    const share = await this.shareRepository.createShareLink({
+      id: shareId,
+      vaultItemId: input.vaultItemId,
+      ownerId: input.ownerId,
+      tokenHash,
+      accessCodeHash,
+      expiresAt,
+      revokedAt: null,
+      createdAt: now,
+      lastAccessedAt: null,
+      accessCount: 0
+    });
+    const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
+    const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : void 0;
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId: share.id,
+      eventType: "created",
+      actorType: "owner",
+      eventAt: now,
+      ownerId: input.ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({
+        vaultItemId: input.vaultItemId,
+        expiresAt
+      })
+    });
+    return {
+      share: {
+        id: share.id,
+        ownerId: share.ownerId,
+        vaultItemId: share.vaultItemId,
+        tokenHash: share.tokenHash,
+        accessCodeHash: share.accessCodeHash,
+        status: share.revokedAt ? "revoked" : share.expiresAt <= now ? "expired" : "active",
+        expiresAt: String(share.expiresAt),
+        revokedAt: share.revokedAt ? String(share.revokedAt) : null,
+        createdAt: String(share.createdAt),
+        updatedAt: String(share.createdAt),
+        publicUrl
+      },
+      rawToken,
+      rawAccessCode
+    };
+  }
+  async revokeShare(ownerId, shareId, now = Date.now()) {
+    const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
+    if (!revoked) {
+      throw new AppError("share_item_inaccessible", 404);
+    }
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId,
+      eventType: "revoked",
+      actorType: "owner",
+      eventAt: now,
+      ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({ revokedAt: now })
+    });
+  }
+  async resolveShareAccess(input) {
+    const now = input.now ?? Date.now();
+    const pepper = getShareSecretPepper(this.env);
+    const tokenHash = await hashShareSecret(pepper, "share-token", input.token);
+    const share = await this.shareRepository.findByTokenHash(tokenHash);
+    if (!share) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share: null, itemView: null };
+    }
+    if (share.revokedAt !== null && share.revokedAt !== void 0) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share, itemView: null };
+    }
+    if (share.expiresAt <= now) {
+      return { accessible: false, status: "expired", reason: "inaccessible", share, itemView: null };
+    }
+    const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId);
+    if (!vaultItem) {
+      return { accessible: false, status: "revoked", reason: "inaccessible", share, itemView: null };
+    }
+    const accessCode = input.accessCode || "";
+    const accessCodeOk = await verifyShareSecret(pepper, "share-access-code", accessCode, share.accessCodeHash);
+    if (!accessCodeOk) {
+      return { accessible: false, status: "active", reason: "inaccessible", share, itemView: null };
+    }
+    return {
+      accessible: true,
+      status: "active",
+      share,
+      itemView: {
+        service: vaultItem.service,
+        account: vaultItem.account
+      },
+      publicHeaders: void 0,
+      publicUrl: input.requestOrigin ? buildShareUrl(input.requestOrigin, input.token) : void 0
+    };
+  }
+};
+function createShareService(env, db = env.DB) {
+  const vaultRepository = new VaultRepository(db);
+  const shareRepository = new ShareRepository(db);
+  return new ShareService(env, vaultRepository, shareRepository);
+}
+
+// ../src/shared/middleware/shareRateLimitMiddleware.ts
+init_config();
+init_logger();
+var shareRateLimit = (options) => {
+  return async (c, next) => {
+    const db = c.env.DB;
+    if (!db) {
+      logger.warn("[ShareRateLimit] access blocked");
+      throw new AppError("share_inaccessible", 404);
+    }
+    const key = options?.keyBuilder ? options.keyBuilder(c) : [
+      "share",
+      c.req.header("CF-Connecting-IP") || "unknown",
+      c.req.path,
+      c.req.param("token") || ""
+    ].filter(Boolean).join(":");
+    try {
+      const repository = new ShareRepository(db);
+      const decision = await repository.enforceRateLimit({
+        key,
+        shareId: c.req.param("token") || key,
+        windowMs: SHARE_RATE_LIMIT_WINDOW_MS,
+        maxAttempts: SHARE_RATE_LIMIT_MAX_ATTEMPTS,
+        lockMs: SHARE_RATE_LIMIT_LOCK_MS
+      });
+      if (!decision.allowed) {
+        logger.warn("[ShareRateLimit] access blocked");
+        throw new AppError("share_inaccessible", 404);
+      }
+    } catch {
+      logger.warn("[ShareRateLimit] access blocked");
+      throw new AppError("share_inaccessible", 404);
+    }
+    await next();
+  };
+};
+
+// ../src/features/share/sharePrimitives.ts
+var SHARE_PRIMITIVES = {
+  ShareService,
+  createShareService,
+  shareRateLimit
+};
+
 // ../src/app/index.ts
 var app = new Hono9();
+app.__sharePrimitives = SHARE_PRIMITIVES;
 app.use("*", async (c, next) => {
   if (c.env) {
     await initializeEnv(c.env);
@@ -7528,11 +8007,11 @@ var SqliteExecutor = class {
     this.db = db;
   }
   engine = "sqlite";
-  async exec(sql2) {
-    this.db.exec(sql2);
+  async exec(sql3) {
+    this.db.exec(sql3);
   }
-  prepare(sql2) {
-    const stmt = this.db.prepare(sql2);
+  prepare(sql3) {
+    const stmt = this.db.prepare(sql3);
     return {
       get: (...params) => stmt.get(...params),
       run: (...params) => stmt.run(...params)
@@ -7560,17 +8039,17 @@ var MySqlExecutor = class {
       bigNumberStrings: false
     });
   }
-  async exec(sql2) {
-    await this.pool.query(sql2);
+  async exec(sql3) {
+    await this.pool.query(sql3);
   }
-  prepare(sql2) {
+  prepare(sql3) {
     return {
       get: async (...params) => {
-        const [rows] = await this.pool.execute(sql2, params);
+        const [rows] = await this.pool.execute(sql3, params);
         return rows[0];
       },
       run: async (...params) => {
-        const [result] = await this.pool.execute(sql2, params);
+        const [result] = await this.pool.execute(sql3, params);
         return result;
       }
     };
@@ -7596,11 +8075,11 @@ var PgExecutor = class {
       ssl: config.ssl ? { rejectUnauthorized: false } : void 0
     });
   }
-  async exec(sql2) {
-    await this.pool.query(sql2);
+  async exec(sql3) {
+    await this.pool.query(sql3);
   }
-  prepare(sql2) {
-    const pgSql = sql2.replace(/\?/g, (match, offset, str) => {
+  prepare(sql3) {
+    const pgSql = sql3.replace(/\?/g, (match, offset, str) => {
       const index = str.slice(0, offset).split("?").length;
       return `$${index}`;
     });
@@ -7678,9 +8157,9 @@ var DbFactory = class {
 init_logger();
 
 // ../src/shared/db/dialects.ts
-function transformSqlForDialect(sql2, engine2) {
-  if (engine2 === "sqlite" || engine2 === "d1") return sql2;
-  let res = sql2;
+function transformSqlForDialect(sql3, engine2) {
+  if (engine2 === "sqlite" || engine2 === "d1") return sql3;
+  let res = sql3;
   if (engine2 === "mysql") {
     res = res.replace(/\bINTEGER PRIMARY KEY AUTOINCREMENT\b/gi, "BIGINT AUTO_INCREMENT PRIMARY KEY");
     res = res.replace(/\bINTEGER\b/gi, "BIGINT");
@@ -7777,6 +8256,38 @@ var BASE_SCHEMA = [
         attempts INTEGER DEFAULT 0,
         last_attempt INTEGER,
         expires_at INTEGER
+    )`,
+  // Share link tables
+  `CREATE TABLE IF NOT EXISTS share_links (
+        id TEXT PRIMARY KEY,
+        vault_item_id TEXT NOT NULL,
+        owner_id TEXT NOT NULL,
+        token_hash TEXT NOT NULL,
+        access_code_hash TEXT NOT NULL,
+        expires_at INTEGER NOT NULL,
+        revoked_at INTEGER,
+        created_at INTEGER NOT NULL,
+        last_accessed_at INTEGER,
+        access_count INTEGER DEFAULT 0
+    )`,
+  `CREATE TABLE IF NOT EXISTS share_audit_events (
+        id TEXT PRIMARY KEY,
+        share_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        actor_type TEXT NOT NULL,
+        event_at INTEGER NOT NULL,
+        owner_id TEXT NOT NULL,
+        ip_hash TEXT,
+        user_agent_hash TEXT,
+        metadata TEXT
+    )`,
+  `CREATE TABLE IF NOT EXISTS share_rate_limits (
+        key TEXT PRIMARY KEY,
+        share_id TEXT NOT NULL,
+        attempts INTEGER DEFAULT 0,
+        window_started_at INTEGER NOT NULL,
+        last_attempt_at INTEGER NOT NULL,
+        locked_until INTEGER
     )`,
   // 设备会话表
   `CREATE TABLE IF NOT EXISTS auth_sessions (
@@ -7926,6 +8437,166 @@ var MIGRATIONS = [
     sqlite: `ALTER TABLE vault ADD COLUMN counter INTEGER DEFAULT 0;`,
     mysql: `ALTER TABLE vault ADD COLUMN counter BIGINT DEFAULT 0;`,
     postgres: `ALTER TABLE vault ADD COLUMN counter BIGINT DEFAULT 0;`
+  },
+  {
+    version: 13,
+    name: "create_share_link_tables",
+    sqlite: `
+            CREATE TABLE IF NOT EXISTS share_links (
+                id TEXT PRIMARY KEY,
+                vault_item_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                access_code_hash TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                revoked_at INTEGER,
+                created_at INTEGER NOT NULL,
+                last_accessed_at INTEGER,
+                access_count INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS share_audit_events (
+                id TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                actor_type TEXT NOT NULL,
+                event_at INTEGER NOT NULL,
+                owner_id TEXT NOT NULL,
+                ip_hash TEXT,
+                user_agent_hash TEXT,
+                metadata TEXT
+            );
+            CREATE TABLE IF NOT EXISTS share_rate_limits (
+                key TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                attempts INTEGER DEFAULT 0,
+                window_started_at INTEGER NOT NULL,
+                last_attempt_at INTEGER NOT NULL,
+                locked_until INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_share_links_vault_item ON share_links(vault_item_id);
+            CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
+            CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `,
+    d1: `
+            CREATE TABLE IF NOT EXISTS share_links (
+                id TEXT PRIMARY KEY,
+                vault_item_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                access_code_hash TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                revoked_at INTEGER,
+                created_at INTEGER NOT NULL,
+                last_accessed_at INTEGER,
+                access_count INTEGER DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS share_audit_events (
+                id TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                actor_type TEXT NOT NULL,
+                event_at INTEGER NOT NULL,
+                owner_id TEXT NOT NULL,
+                ip_hash TEXT,
+                user_agent_hash TEXT,
+                metadata TEXT
+            );
+            CREATE TABLE IF NOT EXISTS share_rate_limits (
+                key TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                attempts INTEGER DEFAULT 0,
+                window_started_at INTEGER NOT NULL,
+                last_attempt_at INTEGER NOT NULL,
+                locked_until INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_share_links_vault_item ON share_links(vault_item_id);
+            CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
+            CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `,
+    mysql: `
+            CREATE TABLE IF NOT EXISTS share_links (
+                id TEXT PRIMARY KEY,
+                vault_item_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                access_code_hash TEXT NOT NULL,
+                expires_at BIGINT NOT NULL,
+                revoked_at BIGINT,
+                created_at BIGINT NOT NULL,
+                last_accessed_at BIGINT,
+                access_count BIGINT DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS share_audit_events (
+                id TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                actor_type TEXT NOT NULL,
+                event_at BIGINT NOT NULL,
+                owner_id TEXT NOT NULL,
+                ip_hash TEXT,
+                user_agent_hash TEXT,
+                metadata TEXT
+            );
+            CREATE TABLE IF NOT EXISTS share_rate_limits (
+                key TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                attempts BIGINT DEFAULT 0,
+                window_started_at BIGINT NOT NULL,
+                last_attempt_at BIGINT NOT NULL,
+                locked_until BIGINT
+            );
+            CREATE INDEX idx_share_links_vault_item ON share_links(vault_item_id);
+            CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
+            CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
+            CREATE INDEX idx_share_links_expires_at ON share_links(expires_at);
+            CREATE INDEX idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
+            CREATE INDEX idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `,
+    postgres: `
+            CREATE TABLE IF NOT EXISTS share_links (
+                id TEXT PRIMARY KEY,
+                vault_item_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                access_code_hash TEXT NOT NULL,
+                expires_at BIGINT NOT NULL,
+                revoked_at BIGINT,
+                created_at BIGINT NOT NULL,
+                last_accessed_at BIGINT,
+                access_count BIGINT DEFAULT 0
+            );
+            CREATE TABLE IF NOT EXISTS share_audit_events (
+                id TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                actor_type TEXT NOT NULL,
+                event_at BIGINT NOT NULL,
+                owner_id TEXT NOT NULL,
+                ip_hash TEXT,
+                user_agent_hash TEXT,
+                metadata TEXT
+            );
+            CREATE TABLE IF NOT EXISTS share_rate_limits (
+                key TEXT PRIMARY KEY,
+                share_id TEXT NOT NULL,
+                attempts BIGINT DEFAULT 0,
+                window_started_at BIGINT NOT NULL,
+                last_attempt_at BIGINT NOT NULL,
+                locked_until BIGINT
+            );
+            CREATE INDEX IF NOT EXISTS idx_share_links_vault_item ON share_links(vault_item_id);
+            CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
+            CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `
   }
 ];
 async function migrateDatabase(db) {
@@ -7934,8 +8605,8 @@ async function migrateDatabase(db) {
   await db.exec(createMetaTable);
   for (const rawSql of BASE_SCHEMA) {
     try {
-      const sql2 = transformSqlForDialect(rawSql.trim(), engine2);
-      await db.prepare(sql2).run();
+      const sql3 = transformSqlForDialect(rawSql.trim(), engine2);
+      await db.prepare(sql3).run();
     } catch (e) {
       const msg = e.message?.toLowerCase() || "";
       if (!msg.includes("already exists")) throw e;
@@ -7953,8 +8624,8 @@ async function migrateDatabase(db) {
       const engineSql = m[engine2] || m.sqlite;
       const statements = engineSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
       for (const rawSql of statements) {
-        const sql2 = transformSqlForDialect(rawSql, engine2);
-        await db.exec(sql2);
+        const sql3 = transformSqlForDialect(rawSql, engine2);
+        await db.exec(sql3);
       }
       const updateMetaRaw = engine2 === "postgres" ? `INSERT INTO _schema_metadata ("key", "value") VALUES ('version', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value` : "REPLACE INTO _schema_metadata (`key`, `value`) VALUES ('version', ?)";
       const updateMeta = transformSqlForDialect(updateMetaRaw, engine2);

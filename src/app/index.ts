@@ -18,6 +18,7 @@ import healthRoutes from '@/features/health/healthRoutes';
 import emergencyRoutes from '@/features/emergency/emergencyRoutes';
 import wcProxyRoutes from '@/features/auth/wcProxyRoutes';
 import { runHealthCheck } from '@/shared/utils/health';
+import { SHARE_PRIMITIVES } from '@/features/share/sharePrimitives';
 
 /**
  * NodeAuth 核心应用入口 (Hono & Middleware)
@@ -29,6 +30,8 @@ type Bindings = EnvBindings & { ASSETS: { fetch: (req: Request) => Promise<Respo
 
 // 初始化 Hono 应用，并绑定 Cloudflare 的环境变量类型
 const app = new Hono<{ Bindings: Bindings }>();
+
+(app as any).__sharePrimitives = SHARE_PRIMITIVES;
 
 // ---------------------------------------------------------
 // 1. 全局中间件 & 安全初始化 (Middleware Layer)
