@@ -2,6 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@/app/config';
 import { shareRateLimit } from '@/shared/middleware/shareRateLimitMiddleware';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
+import { hashShareSecret } from '@/features/share/shareSecurity';
+
+const expectSerializedNotToContain = (value: unknown, forbiddenValues: string[]) => {
+    const serialized = JSON.stringify(value);
+    for (const forbiddenValue of forbiddenValues) {
+        expect(serialized).not.toContain(forbiddenValue);
+    }
+};
 
 const makeContext = (overrides: any = {}) => {
     const defaultEnv = {
@@ -68,6 +76,102 @@ describe('shareRateLimit', () => {
         await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
     });
 
+    it('records a safe audit event when a real share reaches the denied threshold', async () => {
+        const rawToken = 'raw-public-token-123';
+        const rawAccessCode = 'raw-access-code-123';
+        const tokenHash = await hashShareSecret('pepper', 'share-token', rawToken);
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            env: {
+                DB: {},
+            },
+            req: {
+                header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
+                path: `/api/share/public/${rawToken}`,
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: false,
+            attempts: 6,
+            lockedUntil: 2000,
+        });
+        const findByTokenHash = vi.spyOn(ShareRepository.prototype, 'findByTokenHash').mockResolvedValue({
+            id: 'share-1',
+            ownerId: 'owner-1',
+        } as any);
+        const insertAuditEvent = vi.spyOn(ShareRepository.prototype, 'insertAuditEvent').mockResolvedValue();
+
+        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
+
+        const limiterInput = enforceRateLimit.mock.calls[0][0];
+        expect(limiterInput.key).not.toContain(rawToken);
+        expect(limiterInput.shareId).not.toContain(rawToken);
+        expectSerializedNotToContain(limiterInput, [
+            rawToken,
+            rawAccessCode,
+            'password',
+            'seed',
+            'http://',
+            'https://',
+            'publicUrl',
+            'fullUrl',
+        ]);
+        expect(findByTokenHash).toHaveBeenCalledWith(tokenHash);
+        expect(findByTokenHash).not.toHaveBeenCalledWith(rawToken);
+        expect(insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            shareId: 'share-1',
+            eventType: 'access_denied_threshold',
+            actorType: 'recipient',
+            ownerId: 'owner-1',
+            ipHash: null,
+            userAgentHash: null,
+        }));
+        const auditEvent = insertAuditEvent.mock.calls[0][0];
+        expect(auditEvent.metadata).toBe(JSON.stringify({
+            attempts: 6,
+            lockedUntil: 2000,
+            windowMs: 900000,
+        }));
+        expectSerializedNotToContain(auditEvent, [
+            rawToken,
+            rawAccessCode,
+            'password',
+            'seed',
+            'otpauth',
+            'http://',
+            'https://',
+            'publicUrl',
+            'fullUrl',
+        ]);
+    });
+
+    it('skips threshold audit when the denied token hash does not resolve to a share', async () => {
+        const rawToken = 'raw-public-token-123';
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            env: {
+                DB: {},
+            },
+            req: {
+                header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
+                path: `/api/share/public/${rawToken}`,
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: false,
+            attempts: 6,
+            lockedUntil: 2000,
+        });
+        vi.spyOn(ShareRepository.prototype, 'findByTokenHash').mockResolvedValue(null);
+        const insertAuditEvent = vi.spyOn(ShareRepository.prototype, 'insertAuditEvent').mockResolvedValue();
+
+        await expect(middleware(ctx as any, vi.fn())).rejects.toMatchObject({ message: 'share_inaccessible' });
+
+        expect(insertAuditEvent).not.toHaveBeenCalled();
+    });
+
     it('calls next once when allowed', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext({
@@ -106,7 +210,7 @@ describe('shareRateLimit', () => {
         const input = enforceRateLimit.mock.calls[0][0];
         expect(input.key).not.toContain(rawToken);
         expect(input.shareId).not.toContain(rawToken);
-        expect(input.key).toMatch(/^share:1\.2\.3\.4:\/api\/share\/public:[A-Za-z0-9_-]+$/);
+        expect(input.key).toMatch(/^share:1\.2\.3\.4:share-public-access:[A-Za-z0-9_-]+$/);
         expect(input.shareId).toMatch(/^[A-Za-z0-9_-]+$/);
         expect(input.shareId).not.toBe('');
     });
