@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { AppError } from '@/app/config';
 import { ShareService } from '@/features/share/shareService';
+import { hashShareSecret } from '@/features/share/shareSecurity';
 
 const makeVaultItem = (overrides: any = {}) => ({
     id: 'vault-1',
@@ -19,6 +20,33 @@ const makeVaultItem = (overrides: any = {}) => ({
     deletedAt: null,
     ...overrides,
 });
+
+const makeShareRecord = (overrides: any = {}) => ({
+    id: 'share-1',
+    ownerId: 'owner-1',
+    vaultItemId: 'vault-1',
+    tokenHash: 'token-hash',
+    accessCodeHash: 'access-hash',
+    expiresAt: 2000,
+    revokedAt: null,
+    createdAt: 1000,
+    lastAccessedAt: null,
+    accessCount: 0,
+    ...overrides,
+});
+
+const expectRecipientSafeDecision = (decision: any) => {
+    const serialized = JSON.stringify(decision);
+    expect(serialized).not.toContain('ownerId');
+    expect(serialized).not.toContain('vaultItemId');
+    expect(serialized).not.toContain('tokenHash');
+    expect(serialized).not.toContain('accessCodeHash');
+    expect(decision.publicHeaders).toEqual({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+        'Referrer-Policy': 'no-referrer',
+    });
+};
 
 describe('ShareService', () => {
     let vaultRepository: any;
@@ -106,18 +134,7 @@ describe('ShareService', () => {
     });
 
     it('returns inaccessible for expired revoked deleted-item and wrong-code cases', async () => {
-        shareRepository.findByTokenHash.mockResolvedValue({
-            id: 'share-1',
-            ownerId: 'owner-1',
-            vaultItemId: 'vault-1',
-            tokenHash: 'token-hash',
-            accessCodeHash: 'access-hash',
-            expiresAt: 900,
-            revokedAt: null,
-            createdAt: 1000,
-            lastAccessedAt: null,
-            accessCount: 0,
-        });
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ expiresAt: 900 }));
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
 
         await expect(service.resolveShareAccess({
@@ -126,18 +143,7 @@ describe('ShareService', () => {
             now: 1000,
         } as any)).resolves.toMatchObject({ accessible: false, reason: 'inaccessible' });
 
-        shareRepository.findByTokenHash.mockResolvedValue({
-            id: 'share-1',
-            ownerId: 'owner-1',
-            vaultItemId: 'vault-1',
-            tokenHash: 'token-hash',
-            accessCodeHash: 'access-hash',
-            expiresAt: 2000,
-            revokedAt: 1000,
-            createdAt: 1000,
-            lastAccessedAt: null,
-            accessCount: 0,
-        });
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ revokedAt: 1000 }));
 
         await expect(service.resolveShareAccess({
             token: 'token',
@@ -145,18 +151,7 @@ describe('ShareService', () => {
             now: 1000,
         } as any)).resolves.toMatchObject({ accessible: false, reason: 'inaccessible' });
 
-        shareRepository.findByTokenHash.mockResolvedValue({
-            id: 'share-1',
-            ownerId: 'owner-1',
-            vaultItemId: 'vault-1',
-            tokenHash: 'token-hash',
-            accessCodeHash: 'access-hash',
-            expiresAt: 2000,
-            revokedAt: null,
-            createdAt: 1000,
-            lastAccessedAt: null,
-            accessCount: 0,
-        });
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(null);
 
         await expect(service.resolveShareAccess({
@@ -166,24 +161,104 @@ describe('ShareService', () => {
         } as any)).resolves.toMatchObject({ accessible: false, reason: 'inaccessible' });
 
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
-        shareRepository.findByTokenHash.mockResolvedValue({
-            id: 'share-1',
-            ownerId: 'owner-1',
-            vaultItemId: 'vault-1',
-            tokenHash: 'token-hash',
-            accessCodeHash: 'access-hash',
-            expiresAt: 2000,
-            revokedAt: null,
-            createdAt: 1000,
-            lastAccessedAt: null,
-            accessCount: 0,
-        });
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
 
         await expect(service.resolveShareAccess({
             token: 'token',
             accessCode: 'wrong-code',
             now: 1000,
         } as any)).resolves.toMatchObject({ accessible: false, reason: 'inaccessible' });
+    });
+
+    it('serializes missing inaccessible decisions with public headers and no internal share fields', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(null);
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({ accessible: false, reason: 'inaccessible' });
+        expectRecipientSafeDecision(decision);
+    });
+
+    it('serializes expired decisions with public headers and no internal share fields', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ expiresAt: 900 }));
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({ accessible: false, status: 'expired', reason: 'inaccessible' });
+        expectRecipientSafeDecision(decision);
+    });
+
+    it('serializes revoked decisions with public headers and no internal share fields', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ revokedAt: 1000 }));
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({ accessible: false, status: 'revoked', reason: 'inaccessible' });
+        expectRecipientSafeDecision(decision);
+    });
+
+    it('serializes deleted-item decisions with public headers and no internal share fields', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(null);
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({ accessible: false, reason: 'inaccessible' });
+        expectRecipientSafeDecision(decision);
+    });
+
+    it('serializes wrong-code decisions with public headers and no internal share fields', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode: 'wrong-code',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({ accessible: false, status: 'active', reason: 'inaccessible' });
+        expectRecipientSafeDecision(decision);
+    });
+
+    it('serializes successful decisions with public headers and no internal share fields', async () => {
+        const accessCode = 'correct-code';
+        const accessCodeHash = await hashShareSecret('pepper', 'share-access-code', accessCode);
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ accessCodeHash }));
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+
+        const decision = await service.resolveShareAccess({
+            token: 'token',
+            accessCode,
+            requestOrigin: 'https://example.com',
+            now: 1000,
+        } as any);
+
+        expect(decision).toMatchObject({
+            accessible: true,
+            status: 'active',
+            itemView: {
+                service: 'GitHub',
+                account: 'user@example.com',
+            },
+        });
+        expectRecipientSafeDecision(decision);
     });
 
     it('revokes a share and records a safe audit event', async () => {
@@ -201,5 +276,14 @@ describe('ShareService', () => {
         expect(JSON.stringify(shareRepository.insertAuditEvent.mock.calls[0][0])).not.toContain('rawAccessCode');
         expect(JSON.stringify(shareRepository.insertAuditEvent.mock.calls[0][0])).not.toContain('password');
         expect(JSON.stringify(shareRepository.insertAuditEvent.mock.calls[0][0])).not.toContain('seed');
+    });
+
+    it('rejects missing wrong-owner and already-revoked revoke attempts without audit', async () => {
+        shareRepository.revokeForOwner.mockResolvedValue(false);
+
+        await expect(service.revokeShare('owner-1', 'share-1', 1000))
+            .rejects.toMatchObject({ name: 'AppError', message: 'share_item_inaccessible', statusCode: 404 });
+
+        expect(shareRepository.insertAuditEvent).not.toHaveBeenCalled();
     });
 });
