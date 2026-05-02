@@ -62,7 +62,7 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Empty-state vertical spacing, one-time handoff warning blocks |
 | 3xl | 64px | Desktop page-level top/bottom spacing for future public share pages |
 
-Exceptions: use 44px minimum touch targets for `Create share link`, `Copy link`, `Copy access code`, `Unlock shared item`, `Copy password`, `Copy code`, and `Revoke share link`. Preserve existing Element Plus control heights when editable frontend source is restored. Existing generated CSS contains 5/10/15/20 utility values; do not expand or patch generated utilities in Phase 2.
+Exceptions: use 48px minimum touch targets for `Create share link`, `Copy link`, `Copy access code`, `Unlock shared item`, `Copy password`, `Copy code`, and `Revoke share link`. Preserve existing Element Plus control heights when editable frontend source is restored. Existing generated CSS contains 5/10/15/20 utility values; do not expand or patch generated utilities in Phase 2.
 
 ---
 
