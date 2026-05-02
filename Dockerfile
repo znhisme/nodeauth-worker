@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/package*.json ./backend/
 WORKDIR /app/backend
 
-# Install production dependencies (will compile native bindings for the target arch)
-RUN npm install --omit=dev && npm cache clean --force
+# Install locked production dependencies (will compile native bindings for the target arch)
+RUN npm ci --omit=dev && npm cache clean --force
 
 
 # ---------------------------------------------------------

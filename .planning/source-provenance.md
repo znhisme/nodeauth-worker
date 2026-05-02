@@ -1,9 +1,9 @@
 # Source Provenance
 
 Source maps used
-- backend/dist/worker/worker.js.map (61 src entries)
-- backend/dist/docker/server.js.map (65 src entries)
-- backend/dist/netlify/api.mjs.map (64 src entries)
+- backend/dist/worker/worker.js.map (64 src entries)
+- backend/dist/docker/server.js.map (68 src entries)
+- backend/dist/netlify/api.mjs.map (67 src entries)
 
 Editable backend source: restored to src/**
 
@@ -36,11 +36,13 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/features/auth/webAuthnService.ts
 - src/features/backup/backupRoutes.ts
 - src/features/backup/backupService.ts
+- src/features/backup/providers/backupProvider.ts
 - src/features/backup/providers/baiduNetdiskProvider.ts
 - src/features/backup/providers/dropboxProvider.ts
 - src/features/backup/providers/emailProvider.ts
 - src/features/backup/providers/githubProvider.ts
 - src/features/backup/providers/googleDriveProvider.ts
+- src/features/backup/providers/index.ts
 - src/features/backup/providers/oneDriveProvider.ts
 - src/features/backup/providers/s3Provider.ts
 - src/features/backup/providers/telegramProvider.ts
@@ -55,6 +57,7 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/shared/db/d1Executor.ts
 - src/shared/db/db.ts
 - src/shared/db/dialects.ts
+- src/shared/db/executor.ts
 - src/shared/db/factory.ts
 - src/shared/db/migrator.ts
 - src/shared/db/mySqlExecutor.ts

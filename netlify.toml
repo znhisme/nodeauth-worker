@@ -1,7 +1,7 @@
 [build]
   publish = "frontend/dist"
   functions = "backend/dist/netlify"
-  command = "npm install --prefix backend && node scripts/inject_vars.js --platform=netlify"
+  command = "npm ci --prefix backend && node scripts/inject_vars.js --platform=netlify"
 
 [build.environment]
   SECRETS_SCAN_ENABLED = "false"
