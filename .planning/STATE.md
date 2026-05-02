@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-05-02T21:51:35.352Z"
+status: executing
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-05-02T23:26:01.628Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 3
-  completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
-  percent: 100
+  completed_phases: 1
+  total_plans: 13
+  completed_plans: 12
+  percent: 92
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 ## Current Position
 
 Phase: 02 (share-link-api) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
-Last activity: 2026-05-02
+Plan: 6 of 6
+Status: Ready to execute 02-06
+Last activity: 2026-05-02 -- Completed 02-05-PLAN.md
 
-Progress: [██████████] 100%
+Progress: [█████████░] 92%
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [██████████] 100%
 | Phase 02-share-link-api P02 | 9min | 2 tasks | 4 files |
 | Phase 02-share-link-api P03 | 4min | 2 tasks | 2 files |
 | Phase 02-share-link-api P04 | 5min | 2 tasks | 7 files |
+| Phase 02-share-link-api P05 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Recent decisions affecting current work:
 - [Phase 02-share-link-api]: Return the same generic public JSON envelope and no-store/no-referrer headers from both route-level inaccessible decisions and middleware-level blocking. — Middleware can block before the route handler, so it must apply the public privacy contract itself.
 - [Phase 02-share-link-api]: Redact /api/share/public/:token/access in the global Hono logger callback instead of exempting share routes from logging. — Request logging remains useful while raw public share URL tokens are masked before logger.info receives Hono log strings.
 - [Phase 02-share-link-api]: Mount /api/share before the generic /api/* fallback and leave share routes inside the existing health gate. — Valid share APIs must be reachable, unknown share API routes should still fall through to the existing 404 handler, and unsafe deployments should continue blocking sensitive share endpoints.
+- [Phase 02-share-link-api]: Use NODEAUTH_PUBLIC_ORIGIN as the sole trusted browser origin for credentialed API CORS — EnvBindings exposes no separate app-origin setting.
+- [Phase 02-share-link-api]: Verify public share access codes before decrypting vault secret material or generating OTP output — Wrong-code recipient requests must not process protected vault secret material.
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-02T21:51:35.343Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-05-02T23:25:37.818Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None

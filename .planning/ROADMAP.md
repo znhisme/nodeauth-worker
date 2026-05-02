@@ -55,7 +55,7 @@ Plans:
 - [x] 02-02-PLAN.md — Add authenticated owner share APIs and unauthenticated public recipient access endpoint.
 - [x] 02-03-PLAN.md — Mount `/api/share` in the root app and redact public share tokens from request logs.
 - [x] 02-04-PLAN.md — Regenerate and validate Worker, Docker, and Netlify backend bundles from source.
-- [ ] 02-05-PLAN.md — Close source security gaps for credentialed CORS and access-code-first public share access.
+- [x] 02-05-PLAN.md — Close source security gaps for credentialed CORS and access-code-first public share access.
 - [ ] 02-06-PLAN.md — Regenerate Worker, Docker, and Netlify backend bundles with the gap fixes.
 **UI hint**: yes
 
@@ -80,7 +80,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Security Primitives | 4/6 | In Progress | - |
-| 2. Share Link API | 0/TBD | Not started | - |
+| 2. Share Link API | 5/6 | In Progress | - |
 | 3. Cleanup, Compatibility, and Hardening | 0/TBD | Not started | - |
 
 ## Requirement Coverage
