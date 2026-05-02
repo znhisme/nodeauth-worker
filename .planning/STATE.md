@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-05-02T13:37:47.328Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-05-02T13:50:23.547Z"
 last_activity: 2026-05-02
 progress:
   total_phases: 3
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
-  percent: 25
+  completed_plans: 2
+  percent: 50
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 ## Current Position
 
 Phase: 01 (foundation-and-security-primitives) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-05-02
 
-Progress: [███░░░░░░░] 25%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [███░░░░░░░] 25%
 
 *Updated after each plan completion*
 | Phase 01-foundation-and-security-primitives P01 | 14min | 2 tasks | 88 files |
+| Phase 01-foundation-and-security-primitives P02 | 5min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Recent decisions affecting current work:
 - [Phase 01-foundation-and-security-primitives]: Use restored src/** as the primary backend implementation surface; backend/dist/** is regenerated output.
 - [Phase 01-foundation-and-security-primitives]: Keep Phase 1 API-only because editable frontend source is absent and only frontend/dist/** is present.
 - [Phase 01-foundation-and-security-primitives]: Use npm ci for backend dependency installation wherever the backend lockfile is available.
+- [Phase 01-foundation-and-security-primitives]: Treat share-link security as a written contract before route or schema work depends on it.
+- [Phase 01-foundation-and-security-primitives]: Store only HMAC-derived share secrets and keep raw tokens/codes one-time only at creation.
+- [Phase 01-foundation-and-security-primitives]: Keep Phase 1 API-only because editable frontend source is absent in this checkout.
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-02T13:37:28.389Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-05-02T13:50:23.537Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None

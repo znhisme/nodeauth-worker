@@ -31,7 +31,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 4 plans
 Plans:
 - [x] 01-01-PLAN.md — Restore editable backend source, provenance, backend lockfile, and reproducible target build scripts.
-- [ ] 01-02-PLAN.md — Define share-link security contract, domain types, and token/access-code security primitives.
+- [x] 01-02-PLAN.md — Define share-link security contract, domain types, and token/access-code security primitives.
 - [ ] 01-03-PLAN.md — Add durable share schema, repository/service enforcement, audit, and fail-closed rate limiting.
 - [ ] 01-04-PLAN.md — Run blocking schema/migration/test/build alignment validation across backend targets.
 **UI hint**: yes
