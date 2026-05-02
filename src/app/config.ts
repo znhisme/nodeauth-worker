@@ -141,6 +141,7 @@ export const getEffectiveCSP = (env: EnvBindings) => {
 // Cloudflare Workers & Node.js 环境变量类型定义
 export type EnvBindings = {
     DB: any;
+    NODEAUTH_PUBLIC_ORIGIN?: string;
     OAUTH_GITHUB_CLIENT_ID: string;
     OAUTH_GITHUB_CLIENT_SECRET: string;
     OAUTH_GITHUB_REDIRECT_URI: string;
@@ -175,6 +176,9 @@ export type EnvBindings = {
     OAUTH_ALLOW_ALL?: string;       // 是否允许所有用户登录 (仅推荐用于测试演示环境)
     JWT_SECRET: string;
     ENCRYPTION_KEY: string;
+    SHARE_SECRET_PEPPER?: string;
+    SHARE_DEFAULT_TTL_SECONDS?: string;
+    SHARE_MAX_TTL_SECONDS?: string;
     OAUTH_WALLETCONNECT_PROJECT_ID?: string;
     OAUTH_WALLETCONNECT_RPC_URL?: string;
     OAUTH_WALLETCONNECT_SELF_PROXY?: string; // 'true' or 'false'
