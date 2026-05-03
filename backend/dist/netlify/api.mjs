@@ -3443,8 +3443,8 @@ var VaultService = class {
   }
   async batchDeleteAccounts(ids) {
     if (!ids || ids.length === 0) throw new AppError("no_account_ids", 400);
-    const count = await this.repository.batchDelete(ids);
-    return { count };
+    const count2 = await this.repository.batchDelete(ids);
+    return { count: count2 };
   }
   /**
    * 导出前将密文完全还原为明文（SSE 解密 + 零知识解封装）
@@ -3636,8 +3636,8 @@ var VaultService = class {
     let totalProcessedCount = 0;
     if (uniqueAccountsToInsert.length > 0) {
       const startSort = await this.repository.getMaxSortOrder();
-      const count = await batchInsertVaultItems(this.env.DB, uniqueAccountsToInsert, this.encryptionKey, userId, startSort);
-      totalProcessedCount += count;
+      const count2 = await batchInsertVaultItems(this.env.DB, uniqueAccountsToInsert, this.encryptionKey, userId, startSort);
+      totalProcessedCount += count2;
     }
     if (accountsToRevive.length > 0) {
       const startSortForRevive = await this.repository.getMaxSortOrder();
@@ -3875,8 +3875,8 @@ var TrashService = class {
    */
   async batchMoveToTrash(ids) {
     if (!ids || ids.length === 0) return { count: 0 };
-    const count = await this.repository.batchSoftDelete(ids, Date.now());
-    return { success: true, count };
+    const count2 = await this.repository.batchSoftDelete(ids, Date.now());
+    return { success: true, count: count2 };
   }
   /**
    * TRASH: 1.10 越权防御与物理硬删除
@@ -4167,14 +4167,14 @@ var VaultRepository = class {
    */
   async batchSoftDelete(ids, timestamp) {
     if (!ids || ids.length === 0) return 0;
-    let count = 0;
+    let count2 = 0;
     const BATCH = 50;
     for (let i = 0; i < ids.length; i += BATCH) {
       const chunk = ids.slice(i, i + BATCH);
       await this.db.update(vault4).set({ deletedAt: timestamp, sortOrder: 0 }).where(inArray2(vault4.id, chunk));
-      count += chunk.length;
+      count2 += chunk.length;
     }
-    return count;
+    return count2;
   }
   /**
    * TRASH: 清空回收站
@@ -7187,7 +7187,7 @@ import { Hono as Hono6 } from "hono";
 init_config();
 
 // ../src/shared/db/repositories/shareRepository.ts
-import { and as and5, desc as desc7, eq as eq10, isNull as isNull2, sql as sql2 } from "drizzle-orm";
+import { and as and5, count, desc as desc7, eq as eq10, isNull as isNull2, lt as lt2, lte, sql as sql2 } from "drizzle-orm";
 var ShareRepository = class {
   constructor(db) {
     this.db = db;
@@ -7223,6 +7223,37 @@ var ShareRepository = class {
   }
   async insertAuditEvent(input) {
     await this.db.insert(shareAuditEvents4).values(input);
+  }
+  async findExpiredSharesForCleanup(now) {
+    return await this.db.select().from(shareLinks4).where(and5(lte(shareLinks4.expiresAt, now), isNull2(shareLinks4.revokedAt)));
+  }
+  async insertExpiredAuditEventIfMissing(share2, eventAt) {
+    const existing = await this.db.select({ count: count() }).from(shareAuditEvents4).where(and5(eq10(shareAuditEvents4.shareId, share2.id), eq10(shareAuditEvents4.eventType, "expired")));
+    if (Number(existing[0]?.count || 0) > 0) {
+      return false;
+    }
+    await this.db.insert(shareAuditEvents4).values({
+      id: `share-audit-${crypto.randomUUID()}`,
+      shareId: share2.id,
+      eventType: "expired",
+      actorType: "system",
+      eventAt,
+      ownerId: share2.ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: JSON.stringify({
+        expiredAt: eventAt,
+        expiresAt: share2.expiresAt,
+        status: "expired"
+      })
+    });
+    return true;
+  }
+  async deleteStaleRateLimits(cutoff) {
+    const conditions = lt2(shareRateLimits4.lastAttemptAt, cutoff);
+    const countRes = await this.db.select().from(shareRateLimits4).where(conditions);
+    await this.db.delete(shareRateLimits4).where(conditions);
+    return countRes.length;
   }
   async enforceRateLimit(input) {
     const now = input.now ?? Date.now();
@@ -7274,6 +7305,7 @@ var SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
 var SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
 var SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
 var SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1e3;
+var SHARE_RATE_LIMIT_RETENTION_MS = SHARE_RATE_LIMIT_WINDOW_MS + SHARE_RATE_LIMIT_LOCK_MS;
 
 // ../src/features/share/shareSecurity.ts
 var textEncoder = new TextEncoder();
@@ -7539,6 +7571,23 @@ var ShareService = class {
       metadata: toMetadata({ revokedAt: now })
     });
   }
+  async cleanupShareState(now = Date.now()) {
+    const expiredShares = await this.shareRepository.findExpiredSharesForCleanup(now);
+    let expiredSharesMarked = 0;
+    for (const share2 of expiredShares) {
+      const inserted = await this.shareRepository.insertExpiredAuditEventIfMissing(share2, now);
+      if (inserted) {
+        expiredSharesMarked += 1;
+      }
+    }
+    const staleRateLimitCutoff = now - SHARE_RATE_LIMIT_RETENTION_MS;
+    const staleRateLimitRowsDeleted = await this.shareRepository.deleteStaleRateLimits(staleRateLimitCutoff);
+    return {
+      expiredSharesMarked,
+      staleRateLimitRowsDeleted,
+      ranAt: now
+    };
+  }
   async resolveShareAccess(input) {
     const now = input.now ?? Date.now();
     const pepper = getShareSecretPepper(this.env);
@@ -7738,7 +7787,11 @@ share.delete("/:id", authMiddleware, async (c) => {
   const ownerId = user.email || user.id;
   const service = getService3(c);
   const share2 = await service.revokeShareForOwner(ownerId, c.req.param("id"));
-  return c.json({ success: true, share: share2, message: "Share link revoked" });
+  return c.json({
+    success: true,
+    share: share2,
+    message: "Share link revoked. Future access is blocked, but NodeAuth cannot retract credentials already viewed or copied."
+  });
 });
 share.post("/public/:token/access", shareRateLimit(), async (c) => {
   const token = c.req.param("token");
@@ -8791,11 +8844,11 @@ var MIGRATIONS = [
         `,
     mysql: `
             CREATE TABLE IF NOT EXISTS share_links (
-                id TEXT PRIMARY KEY,
-                vault_item_id TEXT NOT NULL,
-                owner_id TEXT NOT NULL,
-                token_hash TEXT NOT NULL,
-                access_code_hash TEXT NOT NULL,
+                id VARCHAR(36) PRIMARY KEY,
+                vault_item_id VARCHAR(36) NOT NULL,
+                owner_id VARCHAR(255) NOT NULL,
+                token_hash VARCHAR(255) NOT NULL,
+                access_code_hash VARCHAR(255) NOT NULL,
                 expires_at BIGINT NOT NULL,
                 revoked_at BIGINT,
                 created_at BIGINT NOT NULL,
@@ -8803,19 +8856,19 @@ var MIGRATIONS = [
                 access_count BIGINT DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS share_audit_events (
-                id TEXT PRIMARY KEY,
-                share_id TEXT NOT NULL,
-                event_type TEXT NOT NULL,
-                actor_type TEXT NOT NULL,
+                id VARCHAR(36) PRIMARY KEY,
+                share_id VARCHAR(36) NOT NULL,
+                event_type VARCHAR(50) NOT NULL,
+                actor_type VARCHAR(50) NOT NULL,
                 event_at BIGINT NOT NULL,
-                owner_id TEXT NOT NULL,
-                ip_hash TEXT,
-                user_agent_hash TEXT,
-                metadata TEXT
+                owner_id VARCHAR(255) NOT NULL,
+                ip_hash VARCHAR(255),
+                user_agent_hash VARCHAR(255),
+                metadata LONGTEXT
             );
             CREATE TABLE IF NOT EXISTS share_rate_limits (
-                key TEXT PRIMARY KEY,
-                share_id TEXT NOT NULL,
+                \`key\` VARCHAR(255) PRIMARY KEY,
+                share_id VARCHAR(36) NOT NULL,
                 attempts BIGINT DEFAULT 0,
                 window_started_at BIGINT NOT NULL,
                 last_attempt_at BIGINT NOT NULL,
