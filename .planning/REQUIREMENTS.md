@@ -42,9 +42,9 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 
 ### Cleanup And UX Contract
 
-- [ ] **UX-01**: System can clean up or mark expired shares and stale share rate-limit state through scheduled or opportunistic backend work.
+- [x] **UX-01**: System can clean up or mark expired shares and stale share rate-limit state through scheduled or opportunistic backend work.
 - [x] **UX-02**: API contract exposes enough safe status information for a future owner UI to distinguish active, expired, revoked, and accessed links.
-- [ ] **UX-03**: API contract and project notes clearly explain that revocation stops future link access but cannot retract credential data already copied by the recipient.
+- [x] **UX-03**: API contract and project notes clearly explain that revocation stops future link access but cannot retract credential data already copied by the recipient.
 - [x] **UX-04**: If editable frontend source is available, implementation scope identifies the owner and recipient UI surfaces needed for share creation, access-code entry, reveal/copy, and revoke flows; otherwise v1 remains API-only with documented contracts.
 
 ### Compatibility And Hardening
@@ -109,9 +109,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-04 | Phase 2 | Complete |
 | REC-05 | Phase 2 | Complete |
 | REC-06 | Phase 2 | Complete |
-| UX-01 | Phase 3 | Pending |
+| UX-01 | Phase 3 | Complete |
 | UX-02 | Phase 2 | Complete |
-| UX-03 | Phase 3 | Pending |
+| UX-03 | Phase 3 | Complete |
 | UX-04 | Phase 1 | Complete |
 | HARD-01 | Phase 3 | Complete |
 | HARD-02 | Phase 3 | Complete |

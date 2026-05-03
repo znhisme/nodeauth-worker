@@ -31,8 +31,8 @@ const requiredGeneratedMarker = [
 
 const fixedMysqlBlock = `
     CREATE TABLE IF NOT EXISTS share_links (
-        id VARCHAR(36) PRIMARY KEY,
-        vault_item_id VARCHAR(36) NOT NULL,
+        id VARCHAR(64) PRIMARY KEY,
+        vault_item_id VARCHAR(64) NOT NULL,
         owner_id VARCHAR(255) NOT NULL,
         token_hash VARCHAR(255) NOT NULL,
         access_code_hash VARCHAR(255) NOT NULL,
@@ -43,8 +43,8 @@ const fixedMysqlBlock = `
         access_count BIGINT DEFAULT 0
     );
     CREATE TABLE IF NOT EXISTS share_audit_events (
-        id VARCHAR(36) PRIMARY KEY,
-        share_id VARCHAR(36) NOT NULL,
+        id VARCHAR(64) PRIMARY KEY,
+        share_id VARCHAR(64) NOT NULL,
         event_type VARCHAR(50) NOT NULL,
         actor_type VARCHAR(50) NOT NULL,
         event_at BIGINT NOT NULL,
@@ -63,7 +63,51 @@ const fixedMysqlBlock = `
     );
 `;
 
-const createTempProject = (mysqlBlock: string): string => {
+const fixedMysqlBaselineBlock = `
+const MYSQL_SHARE_BASE_SCHEMA: string[] = [
+    \`CREATE TABLE IF NOT EXISTS share_links (
+        id VARCHAR(64) PRIMARY KEY,
+        vault_item_id VARCHAR(64) NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        token_hash VARCHAR(255) NOT NULL,
+        access_code_hash VARCHAR(255) NOT NULL,
+        expires_at BIGINT NOT NULL,
+        revoked_at BIGINT,
+        created_at BIGINT NOT NULL,
+        last_accessed_at BIGINT,
+        access_count BIGINT DEFAULT 0
+    )\`,
+    \`CREATE TABLE IF NOT EXISTS share_audit_events (
+        id VARCHAR(64) PRIMARY KEY,
+        share_id VARCHAR(64) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        actor_type VARCHAR(50) NOT NULL,
+        event_at BIGINT NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        ip_hash VARCHAR(255),
+        user_agent_hash VARCHAR(255),
+        metadata LONGTEXT
+    )\`,
+    \`CREATE TABLE IF NOT EXISTS share_rate_limits (
+        \`key\` VARCHAR(255) PRIMARY KEY,
+        share_id VARCHAR(255) NOT NULL,
+        attempts BIGINT DEFAULT 0,
+        window_started_at BIGINT NOT NULL,
+        last_attempt_at BIGINT NOT NULL,
+        locked_until BIGINT
+    )\`,
+];
+
+const getBaseSchemaForEngine = (engine: string): string[] => {
+    if (engine !== 'mysql') {
+        return BASE_SCHEMA;
+    }
+
+    return [...BASE_SCHEMA, ...MYSQL_SHARE_BASE_SCHEMA];
+};
+`;
+
+const createTempProject = (mysqlBlock: string, mysqlBaselineBlock = fixedMysqlBaselineBlock): string => {
     const root = mkdtempSync(join(tmpdir(), 'nodeauth-share-schema-'));
     const scriptPath = join(root, 'scripts/validate_share_schema_alignment.js');
     const files = new Map<string, string>([
@@ -72,6 +116,22 @@ const createTempProject = (mysqlBlock: string): string => {
         ['src/shared/db/schema/mysql.ts', requiredSourceMarker],
         ['src/shared/db/schema/pg.ts', requiredSourceMarker],
         ['src/shared/db/schema/index.ts', requiredSourceMarker],
+        ['src/app/server.ts', `
+            const isShareSchemaStatement = (sql: string): boolean => (
+                sql.includes('CREATE TABLE IF NOT EXISTS share_links') ||
+                sql.includes('CREATE TABLE IF NOT EXISTS share_audit_events') ||
+                sql.includes('CREATE TABLE IF NOT EXISTS share_rate_limits') ||
+                sql.includes('CREATE INDEX IF NOT EXISTS idx_share_links_') ||
+                sql.includes('CREATE INDEX IF NOT EXISTS idx_share_audit_') ||
+                sql.includes('CREATE INDEX IF NOT EXISTS idx_share_rate_limits_')
+            );
+
+            for (const rawSql of statements) {
+                if (executor.engine === 'mysql' && isShareSchemaStatement(rawSql)) {
+                    continue;
+                }
+            }
+        `],
         ['backend/schema.sql', requiredSourceMarker],
         ['backend/dist/worker/worker.js', requiredGeneratedMarker],
         ['backend/dist/docker/server.js', requiredGeneratedMarker],
@@ -85,6 +145,7 @@ const createTempProject = (mysqlBlock: string): string => {
                 mysql: \`${mysqlBlock}\`,
                 postgres: \`SELECT 1;\`,
             }];
+            ${mysqlBaselineBlock}
         `],
     ]);
 
@@ -106,8 +167,8 @@ describe('share schema alignment validator', () => {
         }
     });
 
-    const runValidator = (mysqlBlock: string) => {
-        const scriptPath = createTempProject(mysqlBlock);
+    const runValidator = (mysqlBlock: string, mysqlBaselineBlock?: string) => {
+        const scriptPath = createTempProject(mysqlBlock, mysqlBaselineBlock);
         tempRoots.push(resolve(scriptPath, '../..'));
         return spawnSync(process.execPath, [scriptPath], {
             encoding: 'utf8',
@@ -115,7 +176,7 @@ describe('share schema alignment validator', () => {
     };
 
     it('fails when the MySQL share migration keeps id as TEXT PRIMARY KEY', () => {
-        const result = runValidator(fixedMysqlBlock.replace('id VARCHAR(36) PRIMARY KEY', 'id TEXT PRIMARY KEY'));
+        const result = runValidator(fixedMysqlBlock.replace('id VARCHAR(64) PRIMARY KEY', 'id TEXT PRIMARY KEY'));
 
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain('unbounded TEXT');
@@ -147,5 +208,57 @@ describe('share schema alignment validator', () => {
 
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain('Missing MySQL share migration string');
+    });
+
+    it('fails when the MySQL baseline share block keeps TEXT identifiers', () => {
+        const result = runValidator(
+            fixedMysqlBlock,
+            fixedMysqlBaselineBlock.replace('id VARCHAR(64) PRIMARY KEY', 'id TEXT PRIMARY KEY'),
+        );
+
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('unbounded TEXT');
+    });
+
+    it('fails when Docker MySQL schema preload does not skip share schema statements', () => {
+        const root = mkdtempSync(join(tmpdir(), 'nodeauth-share-schema-'));
+        const scriptPath = join(root, 'scripts/validate_share_schema_alignment.js');
+        const files = new Map<string, string>([
+            ['scripts/validate_share_schema_alignment.js', validatorSource],
+            ['src/shared/db/schema/sqlite.ts', requiredSourceMarker],
+            ['src/shared/db/schema/mysql.ts', requiredSourceMarker],
+            ['src/shared/db/schema/pg.ts', requiredSourceMarker],
+            ['src/shared/db/schema/index.ts', requiredSourceMarker],
+            ['src/app/server.ts', 'const schemaFile = "backend/schema.sql";'],
+            ['backend/schema.sql', requiredSourceMarker],
+            ['backend/dist/worker/worker.js', requiredGeneratedMarker],
+            ['backend/dist/docker/server.js', requiredGeneratedMarker],
+            ['backend/dist/netlify/api.mjs', requiredGeneratedMarker],
+            ['src/shared/db/migrator.ts', `
+                ${requiredSourceMarker}
+                const MIGRATIONS = [{
+                    version: 13,
+                    name: 'create_share_link_tables',
+                    sqlite: \`SELECT 1;\`,
+                    mysql: \`${fixedMysqlBlock}\`,
+                    postgres: \`SELECT 1;\`,
+                }];
+                ${fixedMysqlBaselineBlock}
+            `],
+        ]);
+
+        for (const [relativePath, contents] of files) {
+            const absolutePath = join(root, relativePath);
+            mkdirSync(resolve(absolutePath, '..'), { recursive: true });
+            writeFileSync(absolutePath, contents);
+        }
+
+        tempRoots.push(root);
+        const result = spawnSync(process.execPath, [scriptPath], {
+            encoding: 'utf8',
+        });
+
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Missing Docker MySQL schema preload guard string');
     });
 });

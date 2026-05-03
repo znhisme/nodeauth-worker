@@ -1066,8 +1066,8 @@ var vault2 = mysqlTable("vault", {
   deletedAt: bigint("deleted_at", { mode: "number" })
 });
 var shareLinks2 = mysqlTable("share_links", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  vaultItemId: varchar("vault_item_id", { length: 36 }).notNull(),
+  id: varchar("id", { length: 64 }).primaryKey(),
+  vaultItemId: varchar("vault_item_id", { length: 64 }).notNull(),
   ownerId: varchar("owner_id", { length: 255 }).notNull(),
   tokenHash: varchar("token_hash", { length: 255 }).notNull(),
   accessCodeHash: varchar("access_code_hash", { length: 255 }).notNull(),
@@ -1078,8 +1078,8 @@ var shareLinks2 = mysqlTable("share_links", {
   accessCount: bigint("access_count", { mode: "number" }).notNull().default(0)
 });
 var shareAuditEvents2 = mysqlTable("share_audit_events", {
-  id: varchar("id", { length: 36 }).primaryKey(),
-  shareId: varchar("share_id", { length: 36 }).notNull(),
+  id: varchar("id", { length: 64 }).primaryKey(),
+  shareId: varchar("share_id", { length: 64 }).notNull(),
   eventType: varchar("event_type", { length: 50 }).notNull(),
   actorType: varchar("actor_type", { length: 50 }).notNull(),
   eventAt: bigint("event_at", { mode: "number" }).notNull(),
@@ -8506,6 +8506,52 @@ var BASE_SCHEMA = [
         created_at INTEGER NOT NULL
     )`
 ];
+var MYSQL_SHARE_BASE_SCHEMA = [
+  `CREATE TABLE IF NOT EXISTS share_links (
+        id VARCHAR(64) PRIMARY KEY,
+        vault_item_id VARCHAR(64) NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        token_hash VARCHAR(255) NOT NULL,
+        access_code_hash VARCHAR(255) NOT NULL,
+        expires_at BIGINT NOT NULL,
+        revoked_at BIGINT,
+        created_at BIGINT NOT NULL,
+        last_accessed_at BIGINT,
+        access_count BIGINT DEFAULT 0
+    )`,
+  `CREATE TABLE IF NOT EXISTS share_audit_events (
+        id VARCHAR(64) PRIMARY KEY,
+        share_id VARCHAR(64) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        actor_type VARCHAR(50) NOT NULL,
+        event_at BIGINT NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        ip_hash VARCHAR(255),
+        user_agent_hash VARCHAR(255),
+        metadata LONGTEXT
+    )`,
+  `CREATE TABLE IF NOT EXISTS share_rate_limits (
+        \`key\` VARCHAR(255) PRIMARY KEY,
+        share_id VARCHAR(255) NOT NULL,
+        attempts BIGINT DEFAULT 0,
+        window_started_at BIGINT NOT NULL,
+        last_attempt_at BIGINT NOT NULL,
+        locked_until BIGINT
+    )`
+];
+var getBaseSchemaForEngine = (engine2) => {
+  if (engine2 !== "mysql") {
+    return BASE_SCHEMA;
+  }
+  const baseSchema = [];
+  for (const rawSql of BASE_SCHEMA) {
+    if (rawSql.includes("CREATE TABLE IF NOT EXISTS share_links") || rawSql.includes("CREATE TABLE IF NOT EXISTS share_audit_events") || rawSql.includes("CREATE TABLE IF NOT EXISTS share_rate_limits")) {
+      continue;
+    }
+    baseSchema.push(rawSql);
+  }
+  return [...baseSchema, ...MYSQL_SHARE_BASE_SCHEMA];
+};
 var MIGRATIONS = [
   {
     version: 1,
@@ -8726,8 +8772,8 @@ var MIGRATIONS = [
         `,
     mysql: `
             CREATE TABLE IF NOT EXISTS share_links (
-                id VARCHAR(36) PRIMARY KEY,
-                vault_item_id VARCHAR(36) NOT NULL,
+                id VARCHAR(64) PRIMARY KEY,
+                vault_item_id VARCHAR(64) NOT NULL,
                 owner_id VARCHAR(255) NOT NULL,
                 token_hash VARCHAR(255) NOT NULL,
                 access_code_hash VARCHAR(255) NOT NULL,
@@ -8738,8 +8784,8 @@ var MIGRATIONS = [
                 access_count BIGINT DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS share_audit_events (
-                id VARCHAR(36) PRIMARY KEY,
-                share_id VARCHAR(36) NOT NULL,
+                id VARCHAR(64) PRIMARY KEY,
+                share_id VARCHAR(64) NOT NULL,
                 event_type VARCHAR(50) NOT NULL,
                 actor_type VARCHAR(50) NOT NULL,
                 event_at BIGINT NOT NULL,
@@ -8808,7 +8854,7 @@ async function migrateDatabase(db2) {
   const engine2 = db2.engine;
   const createMetaTable = transformSqlForDialect(`CREATE TABLE IF NOT EXISTS _schema_metadata (\`key\` TEXT PRIMARY KEY, \`value\` TEXT)`, engine2);
   await db2.exec(createMetaTable);
-  for (const rawSql of BASE_SCHEMA) {
+  for (const rawSql of getBaseSchemaForEngine(engine2)) {
     try {
       const sql3 = transformSqlForDialect(rawSql.trim(), engine2);
       await db2.prepare(sql3).run();
@@ -9141,6 +9187,7 @@ var { db, executor } = await DbFactory.create();
 var startupComplete = false;
 var retries = 30;
 var schemaFile = fs3.existsSync(path3.join(baseDir, "schema.sql")) ? path3.join(baseDir, "schema.sql") : path3.join(baseDir, "backend/schema.sql");
+var isShareSchemaStatement = (sql3) => sql3.includes("CREATE TABLE IF NOT EXISTS share_links") || sql3.includes("CREATE TABLE IF NOT EXISTS share_audit_events") || sql3.includes("CREATE TABLE IF NOT EXISTS share_rate_limits") || sql3.includes("CREATE INDEX IF NOT EXISTS idx_share_links_") || sql3.includes("CREATE INDEX IF NOT EXISTS idx_share_audit_") || sql3.includes("CREATE INDEX IF NOT EXISTS idx_share_rate_limits_");
 while (!startupComplete && retries > 0) {
   try {
     logger.info(`[Database] Attempting initialization (Engine: ${executor.engine}, Retries left: ${retries})...`);
@@ -9148,6 +9195,9 @@ while (!startupComplete && retries > 0) {
       const rawSchemaSql = fs3.readFileSync(schemaFile, "utf-8");
       const statements = rawSchemaSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
       for (const rawSql of statements) {
+        if (executor.engine === "mysql" && isShareSchemaStatement(rawSql)) {
+          continue;
+        }
         const sql3 = transformSqlForDialect(rawSql, executor.engine);
         try {
           await executor.exec(sql3);

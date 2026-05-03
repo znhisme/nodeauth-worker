@@ -47,6 +47,15 @@ const schemaFile = fs.existsSync(path.join(baseDir, 'schema.sql'))
     ? path.join(baseDir, 'schema.sql')
     : path.join(baseDir, 'backend/schema.sql');
 
+const isShareSchemaStatement = (sql: string): boolean => (
+    sql.includes('CREATE TABLE IF NOT EXISTS share_links') ||
+    sql.includes('CREATE TABLE IF NOT EXISTS share_audit_events') ||
+    sql.includes('CREATE TABLE IF NOT EXISTS share_rate_limits') ||
+    sql.includes('CREATE INDEX IF NOT EXISTS idx_share_links_') ||
+    sql.includes('CREATE INDEX IF NOT EXISTS idx_share_audit_') ||
+    sql.includes('CREATE INDEX IF NOT EXISTS idx_share_rate_limits_')
+);
+
 while (!startupComplete && retries > 0) {
     try {
         logger.info(`[Database] Attempting initialization (Engine: ${executor.engine}, Retries left: ${retries})...`);
@@ -57,6 +66,10 @@ while (!startupComplete && retries > 0) {
             const statements = rawSchemaSql.split(';').map(s => s.trim()).filter(s => s.length > 0);
 
             for (const rawSql of statements) {
+                if (executor.engine === 'mysql' && isShareSchemaStatement(rawSql)) {
+                    continue;
+                }
+
                 const sql = transformSqlForDialect(rawSql, executor.engine);
                 try {
                     await executor.exec(sql);

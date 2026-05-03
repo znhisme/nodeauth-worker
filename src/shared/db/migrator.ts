@@ -125,6 +125,61 @@ const BASE_SCHEMA: string[] = [
     )`,
 ];
 
+const MYSQL_SHARE_BASE_SCHEMA: string[] = [
+    `CREATE TABLE IF NOT EXISTS share_links (
+        id VARCHAR(64) PRIMARY KEY,
+        vault_item_id VARCHAR(64) NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        token_hash VARCHAR(255) NOT NULL,
+        access_code_hash VARCHAR(255) NOT NULL,
+        expires_at BIGINT NOT NULL,
+        revoked_at BIGINT,
+        created_at BIGINT NOT NULL,
+        last_accessed_at BIGINT,
+        access_count BIGINT DEFAULT 0
+    )`,
+    `CREATE TABLE IF NOT EXISTS share_audit_events (
+        id VARCHAR(64) PRIMARY KEY,
+        share_id VARCHAR(64) NOT NULL,
+        event_type VARCHAR(50) NOT NULL,
+        actor_type VARCHAR(50) NOT NULL,
+        event_at BIGINT NOT NULL,
+        owner_id VARCHAR(255) NOT NULL,
+        ip_hash VARCHAR(255),
+        user_agent_hash VARCHAR(255),
+        metadata LONGTEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS share_rate_limits (
+        \`key\` VARCHAR(255) PRIMARY KEY,
+        share_id VARCHAR(255) NOT NULL,
+        attempts BIGINT DEFAULT 0,
+        window_started_at BIGINT NOT NULL,
+        last_attempt_at BIGINT NOT NULL,
+        locked_until BIGINT
+    )`,
+];
+
+const getBaseSchemaForEngine = (engine: string): string[] => {
+    if (engine !== 'mysql') {
+        return BASE_SCHEMA;
+    }
+
+    const baseSchema: string[] = [];
+    for (const rawSql of BASE_SCHEMA) {
+        if (
+            rawSql.includes('CREATE TABLE IF NOT EXISTS share_links') ||
+            rawSql.includes('CREATE TABLE IF NOT EXISTS share_audit_events') ||
+            rawSql.includes('CREATE TABLE IF NOT EXISTS share_rate_limits')
+        ) {
+            continue;
+        }
+
+        baseSchema.push(rawSql);
+    }
+
+    return [...baseSchema, ...MYSQL_SHARE_BASE_SCHEMA];
+};
+
 /**
  * 迁移条目
  */
@@ -357,8 +412,8 @@ const MIGRATIONS: Migration[] = [
         `,
         mysql: `
             CREATE TABLE IF NOT EXISTS share_links (
-                id VARCHAR(36) PRIMARY KEY,
-                vault_item_id VARCHAR(36) NOT NULL,
+                id VARCHAR(64) PRIMARY KEY,
+                vault_item_id VARCHAR(64) NOT NULL,
                 owner_id VARCHAR(255) NOT NULL,
                 token_hash VARCHAR(255) NOT NULL,
                 access_code_hash VARCHAR(255) NOT NULL,
@@ -369,8 +424,8 @@ const MIGRATIONS: Migration[] = [
                 access_count BIGINT DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS share_audit_events (
-                id VARCHAR(36) PRIMARY KEY,
-                share_id VARCHAR(36) NOT NULL,
+                id VARCHAR(64) PRIMARY KEY,
+                share_id VARCHAR(64) NOT NULL,
                 event_type VARCHAR(50) NOT NULL,
                 actor_type VARCHAR(50) NOT NULL,
                 event_at BIGINT NOT NULL,
@@ -451,7 +506,7 @@ export async function migrateDatabase(db: DbExecutor) {
     //    `d1 execute schema.sql` 步骤，导致数据表为空。
     //    此处遍历执行所有基础 CREATE TABLE IF NOT EXISTS 语句，确保在任意部署
     //    方式下首次请求都能自动完成建表。语句均为幂等操作，不影响已有数据。
-    for (const rawSql of BASE_SCHEMA) {
+    for (const rawSql of getBaseSchemaForEngine(engine)) {
         try {
             // 使用 prepare().run() 而非 exec()：
             // D1 的 exec() 是面向 SQL 文件批处理设计的，对多行 DDL 语句有行解析限制。

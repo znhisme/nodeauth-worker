@@ -20,8 +20,8 @@ export const vault = mysqlTable('vault', {
 });
 
 export const shareLinks = mysqlTable('share_links', {
-    id: varchar('id', { length: 36 }).primaryKey(),
-    vaultItemId: varchar('vault_item_id', { length: 36 }).notNull(),
+    id: varchar('id', { length: 64 }).primaryKey(),
+    vaultItemId: varchar('vault_item_id', { length: 64 }).notNull(),
     ownerId: varchar('owner_id', { length: 255 }).notNull(),
     tokenHash: varchar('token_hash', { length: 255 }).notNull(),
     accessCodeHash: varchar('access_code_hash', { length: 255 }).notNull(),
@@ -33,8 +33,8 @@ export const shareLinks = mysqlTable('share_links', {
 });
 
 export const shareAuditEvents = mysqlTable('share_audit_events', {
-    id: varchar('id', { length: 36 }).primaryKey(),
-    shareId: varchar('share_id', { length: 36 }).notNull(),
+    id: varchar('id', { length: 64 }).primaryKey(),
+    shareId: varchar('share_id', { length: 64 }).notNull(),
     eventType: varchar('event_type', { length: 50 }).notNull(),
     actorType: varchar('actor_type', { length: 50 }).notNull(),
     eventAt: bigint('event_at', { mode: 'number' }).notNull(),

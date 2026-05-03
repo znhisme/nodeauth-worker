@@ -38,13 +38,27 @@ const requiredGeneratedStrings = [
 ];
 
 const requiredMysqlShareMigrationStrings = [
-    'id VARCHAR(36) PRIMARY KEY',
-    'vault_item_id VARCHAR(36) NOT NULL',
+    'id VARCHAR(64) PRIMARY KEY',
+    'vault_item_id VARCHAR(64) NOT NULL',
     'owner_id VARCHAR(255) NOT NULL',
     'token_hash VARCHAR(255) NOT NULL',
     'access_code_hash VARCHAR(255) NOT NULL',
+    'expires_at BIGINT NOT NULL',
+    'revoked_at BIGINT',
+    'created_at BIGINT NOT NULL',
+    'last_accessed_at BIGINT',
+    'access_count BIGINT DEFAULT 0',
+    'share_audit_events',
+    'event_type VARCHAR(50) NOT NULL',
+    'actor_type VARCHAR(50) NOT NULL',
+    'event_at BIGINT NOT NULL',
+    'ip_hash VARCHAR(255)',
+    'user_agent_hash VARCHAR(255)',
+    'metadata LONGTEXT',
     'key VARCHAR(255) PRIMARY KEY',
     'share_id VARCHAR(255) NOT NULL',
+    'window_started_at BIGINT NOT NULL',
+    'last_attempt_at BIGINT NOT NULL',
 ];
 
 const forbiddenMysqlShareMigrationPatterns = [
@@ -56,6 +70,24 @@ const forbiddenMysqlShareMigrationPatterns = [
     /\bshare_id\s+TEXT\b/i,
     /\bkey\s+TEXT\s+PRIMARY\s+KEY\b/i,
     /`key`\s+TEXT\s+PRIMARY\s+KEY\b/i,
+];
+
+const requiredMysqlShareBaselineStrings = [
+    'id VARCHAR(64) PRIMARY KEY',
+    'vault_item_id VARCHAR(64) NOT NULL',
+    'owner_id VARCHAR(255) NOT NULL',
+    'token_hash VARCHAR(255) NOT NULL',
+    'access_code_hash VARCHAR(255) NOT NULL',
+    'share_id VARCHAR(255) NOT NULL',
+    'key VARCHAR(255) PRIMARY KEY',
+];
+
+const requiredDockerMysqlSchemaPreloadStrings = [
+    'const isShareSchemaStatement',
+    "executor.engine === 'mysql' && isShareSchemaStatement(rawSql)",
+    "sql.includes('CREATE TABLE IF NOT EXISTS share_links')",
+    "sql.includes('CREATE TABLE IF NOT EXISTS share_audit_events')",
+    "sql.includes('CREATE TABLE IF NOT EXISTS share_rate_limits')",
 ];
 
 const fail = (message) => {
@@ -109,6 +141,20 @@ const getMysqlShareMigrationBlock = (migratorSource) => {
     return migratorSource.slice(blockStart + 1, blockEnd).replace(/\\?`key\\?`/g, 'key');
 };
 
+const getMysqlShareBaselineBlock = (migratorSource) => {
+    const baseSchemaStart = migratorSource.indexOf('const MYSQL_SHARE_BASE_SCHEMA');
+    if (baseSchemaStart === -1) {
+        fail('Missing MySQL baseline share string block');
+    }
+
+    const blockEnd = migratorSource.indexOf('const getBaseSchemaForEngine', baseSchemaStart);
+    if (blockEnd === -1) {
+        fail('Missing end of MySQL baseline share string block');
+    }
+
+    return migratorSource.slice(baseSchemaStart, blockEnd).replace(/\\?`key\\?`/g, 'key');
+};
+
 for (const relativePath of requiredFiles) {
     readText(relativePath);
 }
@@ -129,6 +175,7 @@ for (const requiredString of requiredSourceStrings) {
 }
 
 const mysqlShareMigrationBlock = getMysqlShareMigrationBlock(readText('src/shared/db/migrator.ts'));
+const mysqlShareBaselineBlock = getMysqlShareBaselineBlock(readText('src/shared/db/migrator.ts'));
 
 for (const forbiddenPattern of forbiddenMysqlShareMigrationPatterns) {
     if (forbiddenPattern.test(mysqlShareMigrationBlock)) {
@@ -139,6 +186,25 @@ for (const forbiddenPattern of forbiddenMysqlShareMigrationPatterns) {
 for (const requiredString of requiredMysqlShareMigrationStrings) {
     if (!mysqlShareMigrationBlock.includes(requiredString)) {
         fail(`Missing MySQL share migration string: ${requiredString}`);
+    }
+}
+
+for (const forbiddenPattern of forbiddenMysqlShareMigrationPatterns) {
+    if (forbiddenPattern.test(mysqlShareBaselineBlock)) {
+        fail(`MySQL baseline share DDL contains unbounded TEXT: ${forbiddenPattern}`);
+    }
+}
+
+for (const requiredString of requiredMysqlShareBaselineStrings) {
+    if (!mysqlShareBaselineBlock.includes(requiredString)) {
+        fail(`Missing MySQL baseline share string: ${requiredString}`);
+    }
+}
+
+const dockerServerSource = readText('src/app/server.ts');
+for (const requiredString of requiredDockerMysqlSchemaPreloadStrings) {
+    if (!dockerServerSource.includes(requiredString)) {
+        fail(`Missing Docker MySQL schema preload guard string: ${requiredString}`);
     }
 }
 
