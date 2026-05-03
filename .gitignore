@@ -21,9 +21,16 @@ npm-debug.log*
 
 # 4. Database & Local Data
 *.db
+*.db-shm
 *.db-journal
 *.db-wal
-**/*.db*
+*.sqlite
+*.sqlite3
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
+d1/
+output/
 
 # 5. Developer Tools & IDEs
 .DS_Store

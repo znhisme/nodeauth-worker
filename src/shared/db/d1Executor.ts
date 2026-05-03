@@ -6,7 +6,9 @@ export class D1Executor implements DbExecutor {
     constructor(private d1: any) { }
 
     async exec(sql: string): Promise<void> {
-        await this.d1.exec(sql);
+        // D1's exec() is SQL-file oriented and can split multi-line DDL into invalid
+        // fragments. Run one already-split statement through prepare() instead.
+        await this.d1.prepare(sql).run();
     }
 
     prepare(sql: string) {

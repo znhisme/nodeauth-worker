@@ -1,8 +1,8 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/qr-utils-C-MFlKj_.js","assets/element-plus-Dh0klhaa.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh61In7b.css","assets/index-c6243024.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/qr-utils-C-MFlKj_.js","assets/element-plus-Dh0klhaa.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh61In7b.css","assets/index-936a7cdd.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css"])))=>i.map(i=>d[i]);
 import { _ as ne, __tla as __tla_0 } from "./pdf-utils-r4RjNe6V.js";
 import { n as pe, O as _e, p as V, b as ee, v as fe, __tla as __tla_1 } from "./vaultService-Bnsr_AJx.js";
 import { B as xe, S as le, a as Se, b as G, c as Ee, d as Te, M as ve, s as Ie, F as Pe, e as de, f as Le, g as Oe } from "./wa-sqlite-l0JLtCOf.js";
-import { l as ue, d as Ue, e as De, __tla as __tla_2 } from "./index-c6243024.js";
+import { l as ue, d as Ue, e as De, __tla as __tla_2 } from "./index-936a7cdd.js";
 import { a as Re } from "./qr-utils-C-MFlKj_.js";
 import { a as he } from "./argon2-browser-qelKfid9.js";
 import { l as be, __tla as __tla_3 } from "./resourceRegistry-BAWP-Piz.js";
@@ -1697,7 +1697,7 @@ let __tla = Promise.all([
             const r = n.vault || [];
             try {
                 const { useAppLockStore: e } = await ne(async ()=>{
-                    const { useAppLockStore: l } = await import("./index-c6243024.js").then(async (m)=>{
+                    const { useAppLockStore: l } = await import("./index-936a7cdd.js").then(async (m)=>{
                         await m.__tla;
                         return m;
                     }).then((f)=>f.Q);
@@ -1705,7 +1705,7 @@ let __tla = Promise.all([
                         useAppLockStore: l
                     };
                 }, __vite__mapDeps([4,5,6,2,1,3,7,8,9])), { unmaskSecretFront: t } = await ne(async ()=>{
-                    const { unmaskSecretFront: l } = await import("./index-c6243024.js").then(async (m)=>{
+                    const { unmaskSecretFront: l } = await import("./index-936a7cdd.js").then(async (m)=>{
                         await m.__tla;
                         return m;
                     }).then((f)=>f.P);

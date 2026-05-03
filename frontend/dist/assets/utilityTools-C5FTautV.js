@@ -1,8 +1,8 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/passwordGenerator-CTFyN0FM.js","assets/element-plus-Dh0klhaa.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh61In7b.css","assets/index-c6243024.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css","assets/timeSync-DDg4huzK.js","assets/qrParser-GH5IjWNg.js","assets/totpSecret-D6CyDybj.js","assets/common-CxZt2Mlo.js","assets/vaultService-Bnsr_AJx.js","assets/resourceRegistry-BAWP-Piz.js","assets/qr-utils-C-MFlKj_.js","assets/appsReview-BRDSyDBB.js","assets/iconProtonAuth-BYzwKNy6.js","assets/iconLastPassAuth-D2Yh0Rzj.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/passwordGenerator-CTFyN0FM.js","assets/element-plus-Dh0klhaa.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh61In7b.css","assets/index-936a7cdd.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css","assets/timeSync-DDg4huzK.js","assets/qrParser-GH5IjWNg.js","assets/totpSecret-D6CyDybj.js","assets/common-CxZt2Mlo.js","assets/vaultService-Bnsr_AJx.js","assets/resourceRegistry-BAWP-Piz.js","assets/qr-utils-C-MFlKj_.js","assets/appsReview-BRDSyDBB.js","assets/iconProtonAuth-BYzwKNy6.js","assets/iconLastPassAuth-D2Yh0Rzj.js"])))=>i.map(i=>d[i]);
 import { _, __tla as __tla_0 } from "./pdf-utils-r4RjNe6V.js";
 import { f as O, S as x, k as B, B as q, a7 as z, W as $, a8 as M } from "./element-plus-Dh0klhaa.js";
 import { I as k } from "./iconToolbox-CiqtW3sE.js";
-import { u as N, i as F, __tla as __tla_1 } from "./index-c6243024.js";
+import { u as N, i as F, __tla as __tla_1 } from "./index-936a7cdd.js";
 import { I as t, M as r, Q as e, F as T, O as m, P as h, u as g, _ as l, Y as E, ac as Q, J as f, X as w, c as y, S as J, a8 as d, aD as p } from "./vue-core-Daban9YF.js";
 import "./compression-utils-CXh1ITwj.js";
 import "./simplewebauthn-3qpiAaRi.js";
