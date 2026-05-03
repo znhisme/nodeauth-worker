@@ -10,6 +10,13 @@ const expectSerializedNotToContain = (value: unknown, forbiddenValues: string[])
     }
 };
 
+const makeHeaderGetter = (values: Record<string, string | null | undefined>) => {
+    const normalizedValues = new Map(
+        Object.entries(values).map(([name, value]) => [name.toLowerCase(), value]),
+    );
+    return vi.fn((name: string) => normalizedValues.get(name.toLowerCase()) ?? null);
+};
+
 const makeContext = (overrides: any = {}) => {
     const defaultEnv = {
         DB: {},
@@ -23,7 +30,7 @@ const makeContext = (overrides: any = {}) => {
             ...(overrides.env || {}),
         },
         req: {
-            header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
+            header: makeHeaderGetter({ 'CF-Connecting-IP': '1.2.3.4' }),
             path: '/share/token',
             param: vi.fn((name: string) => (name === 'token' ? 'token-1' : undefined)),
         },
@@ -225,7 +232,7 @@ describe('shareRateLimit', () => {
         const middleware = shareRateLimit();
         const ctx = makeContext({
             req: {
-                header: vi.fn((name: string) => (name === 'CF-Connecting-IP' ? '1.2.3.4' : null)),
+                header: makeHeaderGetter({ 'CF-Connecting-IP': '1.2.3.4' }),
                 path: '/api/share/public',
                 param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
             },
@@ -244,5 +251,152 @@ describe('shareRateLimit', () => {
         expect(input.key).toMatch(/^share:1\.2\.3\.4:share-public-access:[A-Za-z0-9_-]+$/);
         expect(input.shareId).toMatch(/^[A-Za-z0-9_-]+$/);
         expect(input.shareId).not.toBe('');
+    });
+
+    it('uses the first x-forwarded-for hop when Cloudflare client IP is absent', async () => {
+        const rawToken = 'raw-public-token-123';
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            req: {
+                header: makeHeaderGetter({ 'x-forwarded-for': '203.0.113.10, 10.0.0.2' }),
+                path: '/api/share/public',
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: true,
+            attempts: 1,
+            lockedUntil: null,
+        });
+
+        await middleware(ctx as any, vi.fn());
+
+        const input = enforceRateLimit.mock.calls[0][0];
+        expect(input.key).toMatch(/^share:203\.0\.113\.10:share-public-access:[A-Za-z0-9_-]+$/);
+        expect(input.key).not.toContain('unknown');
+        expect(input.key).not.toContain('10.0.0.2');
+        expect(input.key).not.toContain(rawToken);
+    });
+
+    it('uses x-real-ip when Cloudflare and forwarded client IPs are absent', async () => {
+        const rawToken = 'raw-public-token-123';
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            req: {
+                header: makeHeaderGetter({ 'x-real-ip': '198.51.100.25' }),
+                path: '/api/share/public',
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: true,
+            attempts: 1,
+            lockedUntil: null,
+        });
+
+        await middleware(ctx as any, vi.fn());
+
+        const input = enforceRateLimit.mock.calls[0][0];
+        expect(input.key).toMatch(/^share:198\.51\.100\.25:share-public-access:[A-Za-z0-9_-]+$/);
+        expect(input.key).not.toContain('unknown');
+        expect(input.key).not.toContain(rawToken);
+    });
+
+    it('uses Netlify client connection IP when other client identifiers are absent', async () => {
+        const rawToken = 'raw-public-token-123';
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            req: {
+                header: makeHeaderGetter({ 'x-nf-client-connection-ip': '192.0.2.44' }),
+                path: '/api/share/public',
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: true,
+            attempts: 1,
+            lockedUntil: null,
+        });
+
+        await middleware(ctx as any, vi.fn());
+
+        const input = enforceRateLimit.mock.calls[0][0];
+        expect(input.key).toMatch(/^share:192\.0\.2\.44:share-public-access:[A-Za-z0-9_-]+$/);
+        expect(input.key).not.toContain('unknown');
+        expect(input.key).not.toContain(rawToken);
+    });
+
+    it('falls back to a stable unknown bucket without storing public share secrets', async () => {
+        const rawToken = 'raw-public-token-123';
+        const rawAccessCode = 'raw-access-code-123';
+        const middleware = shareRateLimit();
+        const ctx = makeContext({
+            req: {
+                header: makeHeaderGetter({
+                    'CF-Connecting-IP': '   ',
+                    'x-forwarded-for': ' , ',
+                    'x-real-ip': '',
+                    'x-nf-client-connection-ip': ' ',
+                    'client-ip': '',
+                }),
+                path: `/api/share/public/${rawToken}/access`,
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        });
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: true,
+            attempts: 1,
+            lockedUntil: null,
+        });
+
+        await middleware(ctx as any, vi.fn());
+
+        const input = enforceRateLimit.mock.calls[0][0];
+        expect(input.key).toMatch(/^share:unknown:share-public-access:[A-Za-z0-9_-]+$/);
+        expect(input.key).not.toContain(rawToken);
+        expect(input.shareId).not.toContain(rawToken);
+        expectSerializedNotToContain(input, [
+            rawToken,
+            rawAccessCode,
+            '/api/share/public',
+            'password',
+            'seed',
+            'otpauth',
+            'share-1',
+        ]);
+    });
+
+    it('separates forwarded-header buckets for the same token while preserving the same hashed share id', async () => {
+        const rawToken = 'raw-public-token-123';
+        const middleware = shareRateLimit();
+        const enforceRateLimit = vi.spyOn(ShareRepository.prototype, 'enforceRateLimit').mockResolvedValue({
+            allowed: true,
+            attempts: 1,
+            lockedUntil: null,
+        });
+
+        await middleware(makeContext({
+            req: {
+                header: makeHeaderGetter({ 'x-forwarded-for': '203.0.113.10, 10.0.0.2' }),
+                path: '/api/share/public',
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        }) as any, vi.fn());
+        await middleware(makeContext({
+            req: {
+                header: makeHeaderGetter({ 'x-forwarded-for': '198.51.100.25, 10.0.0.2' }),
+                path: '/api/share/public',
+                param: vi.fn((name: string) => (name === 'token' ? rawToken : undefined)),
+            },
+        }) as any, vi.fn());
+
+        const firstInput = enforceRateLimit.mock.calls[0][0];
+        const secondInput = enforceRateLimit.mock.calls[1][0];
+        expect(firstInput.key).not.toBe(secondInput.key);
+        expect(firstInput.key).toContain('share:203.0.113.10:share-public-access:');
+        expect(secondInput.key).toContain('share:198.51.100.25:share-public-access:');
+        expect(firstInput.shareId).toBe(secondInput.shareId);
+        expect(firstInput.shareId).toMatch(/^[A-Za-z0-9_-]+$/);
+        expectSerializedNotToContain([firstInput, secondInput], [rawToken]);
     });
 });
