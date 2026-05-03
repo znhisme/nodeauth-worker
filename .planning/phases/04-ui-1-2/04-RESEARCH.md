@@ -297,22 +297,22 @@ All claims in this research were verified locally, cited from official docs, or 
 |---|-------|---------|---------------|
 | None | No `[ASSUMED]` claims were used. | All | No user confirmation required for factual claims; planning still must decide whether to restore frontend source or scope backend-only work first. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Where is editable frontend source?** [VERIFIED: frontend source audit]
+1. **RESOLVED — Where is editable frontend source?** [VERIFIED: frontend source audit]
    - What we know: only generated `frontend/dist/**` is present, and `.planning/source-provenance.md` says frontend source is not present. [VERIFIED: `.planning/source-provenance.md`]
-   - What's unclear: whether source is available externally or should be reconstructed. [VERIFIED: no local evidence found]
-   - Recommendation: planner should make frontend source restoration a Wave 0 blocker before UI implementation tasks. [VERIFIED: AGENTS.md]
+   - Decision: Phase 4 plans source-gate UI implementation instead of hand-editing generated Vite chunks. [VERIFIED: `04-03-PLAN.md`]
+   - Resolution: restore editable Vue source externally or in a future phase before implementing `Manage Shares`, My Accounts toolbar changes, and batch-share UI. [VERIFIED: `04-UI-SPEC.md`; VERIFIED: `04-03-PLAN.md`]
 
-2. **Should batch sharing be a backend endpoint or client loop?** [VERIFIED: current API has only single `POST /api/share`]
+2. **RESOLVED — Should batch sharing be a backend endpoint or client loop?** [VERIFIED: current API has only single `POST /api/share`]
    - What we know: current API supports single create/list/detail/revoke and public access. [VERIFIED: `src/features/share/shareRoutes.ts`]
-   - What's unclear: user has not specified partial failure behavior for batch share. [VERIFIED: user prompt]
-   - Recommendation: add `POST /api/share/batch` or equivalent source-level API so latest-share-wins, partial results, and one-time secret return shape are tested once. [VERIFIED: current backend architecture]
+   - Decision: Phase 4 uses a backend `POST /api/share/batch` owner route so latest-share-wins, partial results, one-time secret return shape, request bounds, and privacy allowlists are tested once. [VERIFIED: `04-02-PLAN.md`]
+   - Resolution: failed batch rows return only `requestIndex` and `error: "could_not_create_share"`; successful rows return one-time raw public URL/access code exactly once. [VERIFIED: `04-02-PLAN.md`]
 
-3. **Does "group select all" mean loaded group or all accounts matching group in database?** [VERIFIED: current frontend uses loaded selection; current API is paginated]
+3. **RESOLVED — Does "group select all" mean loaded group or all accounts matching group in database?** [VERIFIED: current frontend uses loaded selection; current API is paginated]
    - What we know: built UI has `selectAllLoaded`; category stats can exceed loaded rows. [VERIFIED: `frontend/dist/assets/vaultList-88fb41a5.js`; VERIFIED: `src/features/vault/vaultRoutes.ts`]
-   - What's unclear: whether user expects selecting unloaded accounts. [VERIFIED: user prompt]
-   - Recommendation: implement and label loaded group select-all unless adding a backend ID enumeration endpoint is explicitly planned. [VERIFIED: current API limitations]
+   - Decision: group select-all means loaded accounts in the current group unless a future backend all-matching ID enumeration endpoint is explicitly added. [VERIFIED: `04-UI-SPEC.md`; VERIFIED: `04-03-PLAN.md`]
+   - Resolution: Phase 4 source gate requires restored frontend source to preserve `select all loaded` and loaded-group semantics before implementing the visible UI controls. [VERIFIED: `04-03-PLAN.md`]
 
 ## Environment Availability
 

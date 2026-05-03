@@ -29,7 +29,7 @@ created: 2026-05-04
 
 - **After every backend task commit:** Run `cd backend && npm test -- ../src/features/share/shareService.test.ts ../src/features/share/shareRoutes.test.ts`
 - **After every plan wave:** Run `cd backend && npm test`
-- **After backend source changes:** Regenerate runtime bundles with `cd backend && npm run build:worker && npm run build:docker && npm run build:netlify && npm run build:vercel`
+- **After backend source changes:** Regenerate runtime bundles with `cd backend && npm run build:worker && npm run build:docker && npm run build:netlify`
 - **Before `$gsd-verify-work`:** Full suite and required backend builds must be green
 - **Max feedback latency:** 60 seconds for targeted tests, 5 minutes for full backend build/test gates
 
