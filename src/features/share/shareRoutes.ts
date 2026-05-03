@@ -18,7 +18,7 @@ share.post('/', authMiddleware, async (c) => {
         return c.json({ success: false, error: 'vaultItemId is required' }, 400);
     }
 
-    const publicOrigin = c.env.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+    const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
     const service = getService(c);
     const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : undefined;
     const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
@@ -40,6 +40,34 @@ share.get('/', authMiddleware, async (c) => {
     const shares = await service.listSharesForOwner(ownerId);
 
     return c.json({ success: true, shares });
+});
+
+share.post('/batch', authMiddleware, async (c) => {
+    const user = c.get('user');
+    const ownerId = user.email || user.id;
+    const body = await c.req.json().catch(() => ({}));
+
+    if (!Array.isArray(body.vaultItemIds) || body.vaultItemIds.length === 0 || body.vaultItemIds.some((id: unknown) => typeof id !== 'string' || id.trim() === '')) {
+        return c.json({ success: false, error: 'vaultItemIds must be a non-empty array of strings' }, 400);
+    }
+
+    if (body.vaultItemIds.length > 50) {
+        return c.json({ success: false, error: 'vaultItemIds cannot exceed 50' }, 400);
+    }
+
+    const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+    const service = getService(c);
+    const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : undefined;
+    const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
+    const result = await service.createSharesForOwnerBatch({
+        ownerId,
+        vaultItemIds: body.vaultItemIds,
+        ttlSeconds,
+        expiresAt,
+        publicOrigin,
+    });
+
+    return c.json({ success: true, result });
 });
 
 share.get('/:id', authMiddleware, async (c) => {
