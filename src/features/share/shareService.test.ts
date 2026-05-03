@@ -284,6 +284,46 @@ describe('ShareService', () => {
         expect(JSON.stringify(revoked)).not.toContain('rawAccessCode');
     });
 
+    it('inserts one safe revoked audit event when an owner revokes a share', async () => {
+        const now = 1234567890;
+        shareRepository.findByIdForOwner.mockResolvedValue(makeShareRecord({
+            id: 'share-1',
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            tokenHash: 'stored-token-hash',
+            accessCodeHash: 'stored-access-code-hash',
+        }));
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            id: 'vault-1',
+            secret: 'vault-secret-seed',
+        }));
+        shareRepository.revokeForOwner.mockResolvedValue(true);
+
+        await service.revokeShareForOwner('owner-1', 'share-1', now);
+
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledTimes(1);
+        const auditEvent = shareRepository.insertAuditEvent.mock.calls[0][0];
+        expect(auditEvent).toMatchObject({
+            shareId: 'share-1',
+            eventType: 'revoked',
+            actorType: 'owner',
+            eventAt: now,
+            ownerId: 'owner-1',
+            ipHash: null,
+            userAgentHash: null,
+        });
+        expect(JSON.parse(auditEvent.metadata)).toEqual({ revokedAt: now });
+        expectSafeAuditEvent(auditEvent, [
+            'raw-public-token-123',
+            'correct-code',
+            'stored-token-hash',
+            'stored-access-code-hash',
+            'vault-secret-seed',
+            'GitHub',
+            'user@example.com',
+        ]);
+    });
+
     it('returns inaccessible for expired revoked deleted-item and wrong-code cases', async () => {
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ expiresAt: 900 }));
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
