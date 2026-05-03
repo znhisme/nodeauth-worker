@@ -115,7 +115,7 @@ describe('share schema alignment validator', () => {
     };
 
     it('fails when the MySQL share migration keeps id as TEXT PRIMARY KEY', () => {
-        const result = runValidator(`${fixedMysqlBlock}\nlegacy_id TEXT PRIMARY KEY;`);
+        const result = runValidator(fixedMysqlBlock.replace('id VARCHAR(36) PRIMARY KEY', 'id TEXT PRIMARY KEY'));
 
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain('unbounded TEXT');
