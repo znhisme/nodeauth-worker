@@ -1,9 +1,9 @@
 # Source Provenance
 
 Source maps used
-- backend/dist/worker/worker.js.map (71 src entries)
-- backend/dist/docker/server.js.map (75 src entries)
-- backend/dist/netlify/api.mjs.map (74 src entries)
+- backend/dist/worker/worker.js.map (72 src entries)
+- backend/dist/docker/server.js.map (76 src entries)
+- backend/dist/netlify/api.mjs.map (75 src entries)
 
 Editable backend source: restored to src/**
 
@@ -50,6 +50,7 @@ UX-04 Phase 1 scope: API-only with documented future UI surfaces
 - src/features/emergency/emergencyRoutes.ts
 - src/features/health/healthRoutes.ts
 - src/features/share/sharePrimitives.ts
+- src/features/share/sharePublicPage.ts
 - src/features/share/shareRoutes.ts
 - src/features/share/shareSecurity.ts
 - src/features/share/shareService.ts

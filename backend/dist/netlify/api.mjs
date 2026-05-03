@@ -7187,7 +7187,7 @@ import { Hono as Hono6 } from "hono";
 init_config();
 
 // ../src/shared/db/repositories/shareRepository.ts
-import { and as and5, count, desc as desc7, eq as eq10, isNull as isNull2, lt as lt2, lte, sql as sql2 } from "drizzle-orm";
+import { and as and5, count, desc as desc7, eq as eq10, gt, isNull as isNull2, lt as lt2, lte, sql as sql2 } from "drizzle-orm";
 var ShareRepository = class {
   constructor(db) {
     this.db = db;
@@ -7214,6 +7214,24 @@ var ShareRepository = class {
     }
     await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
     return true;
+  }
+  async revokeActiveForOwnerVaultItem(ownerId, vaultItemId, revokedAt) {
+    const activeShares = await this.db.select().from(shareLinks4).where(and5(
+      eq10(shareLinks4.ownerId, ownerId),
+      eq10(shareLinks4.vaultItemId, vaultItemId),
+      isNull2(shareLinks4.revokedAt),
+      gt(shareLinks4.expiresAt, revokedAt)
+    ));
+    if (activeShares.length === 0) {
+      return [];
+    }
+    await this.db.update(shareLinks4).set({ revokedAt }).where(and5(
+      eq10(shareLinks4.ownerId, ownerId),
+      eq10(shareLinks4.vaultItemId, vaultItemId),
+      isNull2(shareLinks4.revokedAt),
+      gt(shareLinks4.expiresAt, revokedAt)
+    ));
+    return activeShares;
   }
   async markAccessed(id, accessedAt) {
     await this.db.update(shareLinks4).set({
@@ -7448,6 +7466,23 @@ var ShareService = class {
     if (!vaultItem) {
       throw new AppError("share_item_inaccessible", 404);
     }
+    const replacedShares = await this.shareRepository.revokeActiveForOwnerVaultItem(input.ownerId, input.vaultItemId, now);
+    for (const replacedShare of replacedShares) {
+      await this.shareRepository.insertAuditEvent({
+        id: createId("share-audit"),
+        shareId: replacedShare.id,
+        eventType: "revoked",
+        actorType: "owner",
+        eventAt: now,
+        ownerId: input.ownerId,
+        ipHash: null,
+        userAgentHash: null,
+        metadata: toMetadata({
+          revokedAt: now,
+          reason: "latest_share_wins"
+        })
+      });
+    }
     const rawToken = generateShareToken();
     const rawAccessCode = generateAccessCode();
     const pepper = getShareSecretPepper(this.env);
@@ -7511,6 +7546,27 @@ var ShareService = class {
       rawToken: created.rawToken,
       rawAccessCode: created.rawAccessCode
     };
+  }
+  async createSharesForOwnerBatch(input) {
+    const batchNow = input.now ?? Date.now();
+    const successes = [];
+    const failures = [];
+    for (const [requestIndex, vaultItemId] of input.vaultItemIds.entries()) {
+      try {
+        const share2 = await this.createShareForOwner({
+          ownerId: input.ownerId,
+          vaultItemId,
+          ttlSeconds: input.ttlSeconds,
+          expiresAt: input.expiresAt,
+          now: batchNow,
+          publicOrigin: input.publicOrigin
+        });
+        successes.push({ requestIndex, share: share2 });
+      } catch {
+        failures.push({ requestIndex, error: "could_not_create_share" });
+      }
+    }
+    return { successes, failures };
   }
   async listSharesForOwner(ownerId, now = Date.now()) {
     const shares = await this.shareRepository.listForOwner(ownerId);
@@ -7783,7 +7839,7 @@ share.post("/", authMiddleware, async (c) => {
   if (typeof body.vaultItemId !== "string" || body.vaultItemId.trim() === "") {
     return c.json({ success: false, error: "vaultItemId is required" }, 400);
   }
-  const publicOrigin = c.env.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+  const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
   const service = getService3(c);
   const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : void 0;
   const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : void 0;
@@ -7802,6 +7858,29 @@ share.get("/", authMiddleware, async (c) => {
   const service = getService3(c);
   const shares = await service.listSharesForOwner(ownerId);
   return c.json({ success: true, shares });
+});
+share.post("/batch", authMiddleware, async (c) => {
+  const user = c.get("user");
+  const ownerId = user.email || user.id;
+  const body = await c.req.json().catch(() => ({}));
+  if (!Array.isArray(body.vaultItemIds) || body.vaultItemIds.length === 0 || body.vaultItemIds.some((id) => typeof id !== "string" || id.trim() === "")) {
+    return c.json({ success: false, error: "vaultItemIds must be a non-empty array of strings" }, 400);
+  }
+  if (body.vaultItemIds.length > 50) {
+    return c.json({ success: false, error: "vaultItemIds cannot exceed 50" }, 400);
+  }
+  const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+  const service = getService3(c);
+  const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : void 0;
+  const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : void 0;
+  const result = await service.createSharesForOwnerBatch({
+    ownerId,
+    vaultItemIds: body.vaultItemIds,
+    ttlSeconds,
+    expiresAt,
+    publicOrigin
+  });
+  return c.json({ success: true, result });
 });
 share.get("/:id", authMiddleware, async (c) => {
   const user = c.get("user");
