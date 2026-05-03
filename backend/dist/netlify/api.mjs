@@ -7692,6 +7692,21 @@ function returnShareInaccessible(c) {
   }
   return c.json({ success: false, message: "share_inaccessible", data: null }, 404);
 }
+function firstNonEmptyHeader(c, name) {
+  const value = c.req.header(name)?.trim();
+  return value || null;
+}
+function resolveShareRateLimitClientIp(c) {
+  const cloudflareIp = firstNonEmptyHeader(c, "CF-Connecting-IP");
+  if (cloudflareIp) {
+    return cloudflareIp;
+  }
+  const forwardedFor = c.req.header("x-forwarded-for")?.split(",").map((value) => value.trim()).find(Boolean);
+  if (forwardedFor) {
+    return forwardedFor;
+  }
+  return firstNonEmptyHeader(c, "x-real-ip") || firstNonEmptyHeader(c, "x-nf-client-connection-ip") || firstNonEmptyHeader(c, "client-ip") || "unknown";
+}
 var shareRateLimit = (options) => {
   return async (c, next) => {
     const db = c.env.DB;
@@ -7705,7 +7720,7 @@ var shareRateLimit = (options) => {
       const tokenHash = rawToken ? await hashShareSecret(pepper, "share-token", rawToken) : "missing-token";
       const key = options?.keyBuilder ? options.keyBuilder(c) : [
         "share",
-        c.req.header("CF-Connecting-IP") || "unknown",
+        resolveShareRateLimitClientIp(c),
         "share-public-access",
         tokenHash
       ].filter(Boolean).join(":");
