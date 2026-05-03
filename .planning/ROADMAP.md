@@ -76,7 +76,7 @@ Plans:
 - [x] 03-03-PLAN.md — Document and expose truthful revocation limitation semantics.
 - [x] 03-04-PLAN.md — Fix MySQL share migration compatibility and run blocking schema/build validation.
 - [x] 03-05-PLAN.md — Expand public share security and privacy hardening tests.
-- [ ] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
+- [x] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
 **UI hint**: yes
 
 ## Progress
