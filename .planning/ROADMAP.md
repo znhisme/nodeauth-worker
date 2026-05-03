@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Security Primitives** - Maintainer has editable sources, reproducible builds, a share-link security contract, and durable secure share state.
 - [x] **Phase 2: Share Link API** - Owners can create/manage one-item share links and friends can access the shared account through token plus access code.
-- [x] **Phase 3: Cleanup, Compatibility, and Hardening** - Expired share state is maintained, UX semantics are clear, and security/runtime regressions are covered.
+- [ ] **Phase 3: Cleanup, Compatibility, and Hardening** - Expired share state is maintained, UX semantics are clear, and security/runtime regressions are covered.
 
 ## Phase Details
 
@@ -93,7 +93,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation and Security Primitives | 7/7 | Complete | 2026-05-02 |
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
-| 3. Cleanup, Compatibility, and Hardening | 9/9 | Complete | 2026-05-03 |
+| 3. Cleanup, Compatibility, and Hardening | 9/11 | Executing | - |
 
 ## Requirement Coverage
 
