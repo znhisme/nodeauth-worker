@@ -112,6 +112,7 @@ describe('ShareService', () => {
             findByIdForOwner: vi.fn(),
             listForOwner: vi.fn(),
             revokeForOwner: vi.fn(),
+            revokeActiveForOwnerVaultItem: vi.fn().mockResolvedValue([]),
             markAccessed: vi.fn(),
             insertAuditEvent: vi.fn(),
             enforceRateLimit: vi.fn(),
@@ -188,6 +189,89 @@ describe('ShareService', () => {
         expect(createInput.accessCodeHash).toMatch(/^[A-Za-z0-9_-]+$/);
         expect(JSON.stringify(createInput)).not.toContain(result.rawToken);
         expect(JSON.stringify(createInput)).not.toContain(result.rawAccessCode);
+    });
+
+    it('latest-share-wins revokes older active shares before returning the new share and records safe audit metadata', async () => {
+        const now = 2000;
+        const oldShare = makeShareRecord({
+            id: 'share-old',
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            tokenHash: 'old-token-hash',
+            accessCodeHash: 'old-access-code-hash',
+            expiresAt: 4000,
+            revokedAt: null,
+        });
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            id: 'vault-1',
+            secret: 'vault-secret-seed',
+        }));
+        shareRepository.revokeActiveForOwnerVaultItem.mockResolvedValue([oldShare]);
+        shareRepository.createShareLink.mockResolvedValue({
+            id: 'share-new',
+            vaultItemId: 'vault-1',
+            ownerId: 'owner-1',
+            tokenHash: 'new-token-hash',
+            accessCodeHash: 'new-access-code-hash',
+            expiresAt: 5000,
+            revokedAt: null,
+            createdAt: now,
+            lastAccessedAt: null,
+            accessCount: 0,
+        });
+
+        const result = await service.createShare({
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            now,
+            expiresAt: 5000,
+            publicOrigin: 'https://share.example.test',
+        } as any);
+
+        expect(shareRepository.revokeActiveForOwnerVaultItem)
+            .toHaveBeenCalledWith('owner-1', 'vault-1', now);
+        expect(shareRepository.revokeActiveForOwnerVaultItem.mock.invocationCallOrder[0])
+            .toBeGreaterThan(vaultRepository.findActiveByIdForOwner.mock.invocationCallOrder[0]);
+        expect(shareRepository.revokeActiveForOwnerVaultItem.mock.invocationCallOrder[0])
+            .toBeLessThan(shareRepository.createShareLink.mock.invocationCallOrder[0]);
+        expect(result.rawToken).toBeTruthy();
+        expect(result.rawAccessCode).toBeTruthy();
+
+        const replacementAudit = shareRepository.insertAuditEvent.mock.calls
+            .map((call: any[]) => call[0])
+            .find((event: any) => event.shareId === 'share-old' && event.eventType === 'revoked');
+
+        expect(replacementAudit).toMatchObject({
+            shareId: 'share-old',
+            eventType: 'revoked',
+            actorType: 'owner',
+            eventAt: now,
+            ownerId: 'owner-1',
+            ipHash: null,
+            userAgentHash: null,
+        });
+        expect(JSON.parse(replacementAudit.metadata)).toEqual({
+            revokedAt: now,
+            reason: 'latest_share_wins',
+        });
+        expectSafeAuditEvent(replacementAudit, [
+            result.rawToken,
+            result.rawAccessCode,
+            'rawToken',
+            'rawAccessCode',
+            'old-token-hash',
+            'old-access-code-hash',
+            'new-token-hash',
+            'new-access-code-hash',
+            'vault-secret-seed',
+            'password',
+            'secret',
+            'seed',
+            'http://',
+            'https://',
+            'publicUrl',
+            'fullUrl',
+        ]);
     });
 
     it('serializes owner metadata without forbidden secret fields and with descending status coverage', async () => {
@@ -444,6 +528,30 @@ describe('ShareService', () => {
 
         expectPublicInaccessibleDecision(decision, rawToken);
         expect(decision.status).toBe('revoked');
+        expect(decryptSpy).not.toHaveBeenCalled();
+        expect(generateSpy).not.toHaveBeenCalled();
+    });
+
+    it('latest-share-wins replaced token resolves through the generic inaccessible contract without secret processing', async () => {
+        const rawToken = 'replaced-raw-public-token-123';
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        const generateSpy = vi.spyOn(otpModule, 'generate');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({
+            id: 'share-old',
+            revokedAt: 2000,
+            tokenHash: 'old-token-hash',
+            accessCodeHash: 'old-access-code-hash',
+        }));
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 3000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken);
+        expect(decision.status).toBe('revoked');
+        expect(vaultRepository.findActiveByIdForOwner).not.toHaveBeenCalled();
         expect(decryptSpy).not.toHaveBeenCalled();
         expect(generateSpy).not.toHaveBeenCalled();
     });
