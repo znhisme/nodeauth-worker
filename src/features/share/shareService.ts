@@ -84,6 +84,24 @@ export class ShareService {
             throw new AppError('share_item_inaccessible', 404);
         }
 
+        const replacedShares = await this.shareRepository.revokeActiveForOwnerVaultItem(input.ownerId, input.vaultItemId, now);
+        for (const replacedShare of replacedShares) {
+            await this.shareRepository.insertAuditEvent({
+                id: createId('share-audit'),
+                shareId: replacedShare.id,
+                eventType: 'revoked',
+                actorType: 'owner',
+                eventAt: now,
+                ownerId: input.ownerId,
+                ipHash: null,
+                userAgentHash: null,
+                metadata: toMetadata({
+                    revokedAt: now,
+                    reason: 'latest_share_wins',
+                }),
+            });
+        }
+
         const rawToken = generateShareToken();
         const rawAccessCode = generateAccessCode();
         const pepper = getShareSecretPepper(this.env);
