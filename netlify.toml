@@ -1,7 +1,7 @@
 [build]
   publish = "frontend/dist"
   functions = "backend/dist/netlify"
-  command = "npm ci --prefix backend && node scripts/inject_vars.js --platform=netlify"
+  command = "node scripts/inject_vars.js --platform=netlify"
 
 [build.environment]
   SECRETS_SCAN_ENABLED = "false"
@@ -18,12 +18,15 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["better-sqlite3", "pg", "mysql2", "nodemailer", "cloudflare:sockets"]
+  external_node_modules = ["better-sqlite3", "pg", "mysql2", "cloudflare:sockets"]
   included_files = [
-    "!backend/src/**",
-    "!backend/scripts/**",
+    "!api/**",
     "!backend/dist/worker/**",
-    "!backend/dist/docker/**"
+    "!backend/dist/docker/**",
+    "!backend/dist/vercel/**"
   ]
 
 [functions."api"]
+
+[functions."cron"]
+  schedule = "0 2 * * *"
