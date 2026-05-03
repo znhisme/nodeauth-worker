@@ -77,7 +77,7 @@ Plans:
 - [x] 03-04-PLAN.md — Fix MySQL share migration compatibility and run blocking schema/build validation.
 - [x] 03-05-PLAN.md — Expand public share security and privacy hardening tests.
 - [x] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
-- [ ] 03-07-PLAN.md — Close public share rate-limit compatibility gap for Docker and Netlify client identifiers.
+- [x] 03-07-PLAN.md — Close public share rate-limit compatibility gap for Docker and Netlify client identifiers.
 **UI hint**: yes
 
 ## Progress

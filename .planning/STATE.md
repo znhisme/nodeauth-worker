@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-05-03T10:40:26.516Z"
-last_activity: 2026-05-03 -- Phase 03 planning complete
+status: verifying
+stopped_at: Completed 03-cleanup-compatibility-and-hardening-07-PLAN.md
+last_updated: "2026-05-03T10:59:16.016Z"
+last_activity: 2026-05-03
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 Phase: 03 (cleanup-compatibility-and-hardening) — EXECUTING
 Plan: 7 of 7
-Status: Ready to execute
-Last activity: 2026-05-03 -- Phase 03 planning complete
+Status: Phase complete — ready for verification
+Last activity: 2026-05-03
 
-Progress: [█████████▌] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [█████████▌] 95%
 | Phase 02-share-link-api P04 | 5min | 2 tasks | 7 files |
 | Phase 02-share-link-api P05 | 6min | 2 tasks | 5 files |
 | Phase 02-share-link-api P06 | 5min | 3 tasks | 7 files |
+| Phase 03-cleanup-compatibility-and-hardening P07 | 5min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Recent decisions affecting current work:
 - [Phase 02-share-link-api]: Verify public share access codes before decrypting vault secret material or generating OTP output — Wrong-code recipient requests must not process protected vault secret material.
 - [Phase 02-share-link-api]: Regenerate Worker, Docker, and Netlify backend bundles only through existing backend build scripts, with no hand edits to backend/dist/**.
 - [Phase 02-share-link-api]: Use generated-output assertions as the acceptance gate for trusted CORS and access-code-first share access in every runtime bundle.
+- [Phase 03-cleanup-compatibility-and-hardening]: Treat forwarded client headers as limiter bucket inputs only, not recipient identity or audit attribution. — Forwarded headers can be spoofed outside trusted proxies, but this plan only uses them to avoid collapsing supported-runtime public share limiter buckets.
+- [Phase 03-cleanup-compatibility-and-hardening]: Preserve the exact share:<clientIdentifier>:share-public-access:<tokenHash> limiter key format while expanding runtime header support. — Existing repository enforcement and generated assertions depend on the key family while the compatibility gap only required client identifier resolution.
+- [Phase 03-cleanup-compatibility-and-hardening]: Leave .planning/source-provenance.md unchanged because source-map verification passed after regeneration. — The generated source maps matched restored source and provenance after rebuilding Worker Docker and Netlify bundles.
 
 ### Pending Todos
 
@@ -117,6 +121,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-03T06:58:45.569Z
-Stopped at: Phase 3 UI-SPEC approved
-Resume file: .planning/phases/03-cleanup-compatibility-and-hardening/03-UI-SPEC.md
+Last session: 2026-05-03T10:58:28.394Z
+Stopped at: Completed 03-cleanup-compatibility-and-hardening-07-PLAN.md
+Resume file: None

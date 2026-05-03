@@ -49,10 +49,10 @@ Requirements for the first share-link milestone. Each maps to roadmap phases.
 
 ### Compatibility And Hardening
 
-- [ ] **HARD-01**: Share-link schema, repository, and route behavior are tested against the supported database/runtime paths available in this checkout.
-- [ ] **HARD-02**: Tests cover expired, revoked, wrong-code, locked/rate-limited, deleted-item, wrong-owner, and token-enumeration scenarios.
+- [x] **HARD-01**: Share-link schema, repository, and route behavior are tested against the supported database/runtime paths available in this checkout.
+- [x] **HARD-02**: Tests cover expired, revoked, wrong-code, locked/rate-limited, deleted-item, wrong-owner, and token-enumeration scenarios.
 - [ ] **HARD-03**: Tests verify public response allowlists, secure headers, generic public errors, and log redaction for share routes.
-- [ ] **HARD-04**: Existing NodeAuth auth, vault, backup, health, and deployment behavior does not regress after share-link API support is added.
+- [x] **HARD-04**: Existing NodeAuth auth, vault, backup, health, and deployment behavior does not regress after share-link API support is added.
 
 ## v2 Requirements
 
@@ -113,10 +113,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UX-02 | Phase 2 | Complete |
 | UX-03 | Phase 3 | Pending |
 | UX-04 | Phase 1 | Complete |
-| HARD-01 | Phase 3 | Pending |
-| HARD-02 | Phase 3 | Pending |
+| HARD-01 | Phase 3 | Complete |
+| HARD-02 | Phase 3 | Complete |
 | HARD-03 | Phase 3 | Pending |
-| HARD-04 | Phase 3 | Pending |
+| HARD-04 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 29 total
