@@ -201,6 +201,18 @@ export class ShareService {
             throw new AppError('share_item_inaccessible', 404);
         }
 
+        await this.shareRepository.insertAuditEvent({
+            id: createId('share-audit'),
+            shareId,
+            eventType: 'revoked',
+            actorType: 'owner',
+            eventAt: now,
+            ownerId,
+            ipHash: null,
+            userAgentHash: null,
+            metadata: toMetadata({ revokedAt: now }),
+        });
+
         const revokedShare = {
             ...(share as ShareLinkRecord),
             revokedAt: now,
