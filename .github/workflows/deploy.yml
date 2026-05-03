@@ -16,6 +16,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Backend Dependencies
+        run: npm install --prefix backend
+
       - name: Check Required Secrets
         env:
           NODEAUTH_LICENSE: ${{ secrets.NODEAUTH_LICENSE }}
