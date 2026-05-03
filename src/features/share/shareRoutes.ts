@@ -20,11 +20,13 @@ share.post('/', authMiddleware, async (c) => {
 
     const publicOrigin = c.env.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
     const service = getService(c);
+    const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : undefined;
+    const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
     const share = await service.createShareForOwner({
         ownerId,
         vaultItemId: body.vaultItemId,
-        ttlSeconds: typeof body.ttlSeconds === 'number' ? body.ttlSeconds : undefined,
-        expiresAt: typeof body.expiresAt === 'number' ? body.expiresAt : undefined,
+        ttlSeconds,
+        expiresAt,
         publicOrigin,
     });
 
