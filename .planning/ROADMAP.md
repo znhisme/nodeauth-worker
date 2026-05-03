@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation and Security Primitives** - Maintainer has editable sources, reproducible builds, a share-link security contract, and durable secure share state.
 - [x] **Phase 2: Share Link API** - Owners can create/manage one-item share links and friends can access the shared account through token plus access code.
-- [ ] **Phase 3: Cleanup, Compatibility, and Hardening** - Expired share state is maintained, UX semantics are clear, and security/runtime regressions are covered.
+- [x] **Phase 3: Cleanup, Compatibility, and Hardening** - Expired share state is maintained, UX semantics are clear, and security/runtime regressions are covered.
 
 ## Phase Details
 
@@ -79,7 +79,7 @@ Plans:
 - [x] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
 - [x] 03-07-PLAN.md — Close public share rate-limit compatibility gap for Docker and Netlify client identifiers.
 - [x] 03-08-PLAN.md — Widen MySQL share rate-limit identifiers and reject non-finite create input.
-- [ ] 03-09-PLAN.md — Emit revocation audit events and regenerate backend bundles.
+- [x] 03-09-PLAN.md — Emit revocation audit events and regenerate backend bundles.
 **UI hint**: yes
 
 ## Progress
@@ -91,7 +91,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation and Security Primitives | 7/7 | Complete | 2026-05-02 |
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
-| 3. Cleanup, Compatibility, and Hardening | 7/9 | In progress | - |
+| 3. Cleanup, Compatibility, and Hardening | 9/9 | Complete | 2026-05-03 |
 
 ## Requirement Coverage
 
