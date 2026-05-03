@@ -9,12 +9,14 @@ const mocks = vi.hoisted(() => {
         await next();
     });
     const createShareForOwner = vi.fn();
+    const createSharesForOwnerBatch = vi.fn();
     const listSharesForOwner = vi.fn();
     const getShareForOwner = vi.fn();
     const revokeShareForOwner = vi.fn();
     const resolveShareAccess = vi.fn();
     const createShareService = vi.fn(() => ({
         createShareForOwner,
+        createSharesForOwnerBatch,
         listSharesForOwner,
         getShareForOwner,
         revokeShareForOwner,
@@ -28,6 +30,7 @@ const mocks = vi.hoisted(() => {
     return {
         authMiddleware,
         createShareForOwner,
+        createSharesForOwnerBatch,
         listSharesForOwner,
         getShareForOwner,
         revokeShareForOwner,
@@ -115,6 +118,18 @@ const expectPublicFailureAllowlist = (body: any) => {
     expect(body).toEqual({ success: false, message: 'share_inaccessible', data: null });
 };
 
+const expectBatchSuccessAllowlist = (row: any) => {
+    expect(Object.keys(row).sort()).toEqual(['requestIndex', 'share']);
+    expect(typeof row.requestIndex).toBe('number');
+    expectOwnerMetadataAllowlist(row.share, true);
+};
+
+const expectBatchFailureAllowlist = (row: any) => {
+    expect(Object.keys(row).sort()).toEqual(['error', 'requestIndex']);
+    expect(row.error).toBe('could_not_create_share');
+    expect(typeof row.requestIndex).toBe('number');
+};
+
 describe('Share link routes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -162,6 +177,176 @@ describe('Share link routes', () => {
             publicOrigin: 'https://shares.example',
         });
         expectOwnerResponseIsSafe(body, true);
+    });
+
+    it('POST /api/share/batch creates owner-scoped batch shares and ignores attacker-supplied ownerId', async () => {
+        mocks.createSharesForOwnerBatch.mockResolvedValue({
+            successes: [
+                {
+                    requestIndex: 0,
+                    share: {
+                        ...makeMetadataShare({ id: 'share-1' }),
+                        rawToken: 'raw-token-1',
+                        rawAccessCode: 'code-1',
+                    },
+                },
+                {
+                    requestIndex: 1,
+                    share: {
+                        ...makeMetadataShare({ id: 'share-2', item: { id: 'vault-2', service: 'GitLab', account: 'team@example.com' } }),
+                        rawToken: 'raw-token-2',
+                        rawAccessCode: 'code-2',
+                    },
+                },
+            ],
+            failures: [],
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/batch', {
+            method: 'POST',
+            body: JSON.stringify({
+                ownerId: 'attacker@example.com',
+                vaultItemIds: ['vault-1', 'vault-2'],
+                ttlSeconds: 3600,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, {
+            NODEAUTH_PUBLIC_ORIGIN: 'https://shares.example',
+        } as any);
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(Object.keys(body).sort()).toEqual(['result', 'success']);
+        expect(body.success).toBe(true);
+        expect(body.result.successes).toHaveLength(2);
+        expect(body.result.failures).toEqual([]);
+        expectBatchSuccessAllowlist(body.result.successes[0]);
+        expectBatchSuccessAllowlist(body.result.successes[1]);
+        expect(body.result.successes[0].share.rawToken).toBe('raw-token-1');
+        expect(body.result.successes[0].share.rawAccessCode).toBe('code-1');
+        expect(mocks.createSharesForOwnerBatch).toHaveBeenCalledWith({
+            ownerId: 'owner@example.com',
+            vaultItemIds: ['vault-1', 'vault-2'],
+            ttlSeconds: 3600,
+            expiresAt: undefined,
+            publicOrigin: 'https://shares.example',
+        });
+        expectOwnerResponseIsSafe(body, true);
+        expect(JSON.stringify(mocks.createSharesForOwnerBatch.mock.calls)).not.toContain('attacker@example.com');
+    });
+
+    it.each([
+        ['missing array', {}],
+        ['empty array', { vaultItemIds: [] }],
+        ['non-array', { vaultItemIds: 'vault-1' }],
+        ['blank string item', { vaultItemIds: ['vault-1', ''] }],
+        ['non-string item', { vaultItemIds: ['vault-1', 123] }],
+    ])('POST /api/share/batch rejects invalid vaultItemIds: %s', async (_label, payload) => {
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/batch', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(body).toEqual({ success: false, error: 'vaultItemIds must be a non-empty array of strings' });
+        expect(mocks.createSharesForOwnerBatch).not.toHaveBeenCalled();
+    });
+
+    it('POST /api/share/batch rejects more than 50 vault item ids', async () => {
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/batch', {
+            method: 'POST',
+            body: JSON.stringify({
+                vaultItemIds: Array.from({ length: 51 }, (_value, index) => `vault-${index}`),
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(400);
+        expect(body).toEqual({ success: false, error: 'vaultItemIds cannot exceed 50' });
+        expect(mocks.createSharesForOwnerBatch).not.toHaveBeenCalled();
+    });
+
+    it('POST /api/share/batch returns generic privacy-safe partial failures', async () => {
+        mocks.createSharesForOwnerBatch.mockResolvedValue({
+            successes: [
+                {
+                    requestIndex: 0,
+                    share: {
+                        ...makeMetadataShare({ id: 'share-1' }),
+                        rawToken: 'raw-token-1',
+                        rawAccessCode: 'code-1',
+                    },
+                },
+            ],
+            failures: [
+                {
+                    requestIndex: 1,
+                    error: 'could_not_create_share',
+                },
+            ],
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/batch', {
+            method: 'POST',
+            body: JSON.stringify({
+                ownerId: 'attacker@example.com',
+                vaultItemIds: ['vault-1', 'inaccessible-vault'],
+                expiresAt: 4600,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.success).toBe(true);
+        expectBatchSuccessAllowlist(body.result.successes[0]);
+        expectBatchFailureAllowlist(body.result.failures[0]);
+        expect(body.result.failures[0]).toEqual({
+            requestIndex: 1,
+            error: 'could_not_create_share',
+        });
+        expect(mocks.createSharesForOwnerBatch).toHaveBeenCalledWith({
+            ownerId: 'owner@example.com',
+            vaultItemIds: ['vault-1', 'inaccessible-vault'],
+            ttlSeconds: undefined,
+            expiresAt: 4600,
+            publicOrigin: 'https://nodeauth.test',
+        });
+
+        const serialized = JSON.stringify(body);
+        for (const forbidden of [
+            'inaccessible-vault',
+            'attacker@example.com',
+            'ownerId',
+            'tokenHash',
+            'accessCodeHash',
+            'session',
+            'backup',
+            'password',
+            'secret',
+            'seed',
+            'otpauth',
+            'stack',
+            'trace',
+            'Inaccessible Account',
+        ]) {
+            expect(serialized).not.toContain(forbidden);
+        }
     });
 
     it('POST /api/share strips non-finite ttlSeconds and expiresAt before creating a share', async () => {
