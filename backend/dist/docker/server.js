@@ -1090,7 +1090,7 @@ var shareAuditEvents2 = mysqlTable("share_audit_events", {
 });
 var shareRateLimits2 = mysqlTable("share_rate_limits", {
   key: varchar("key", { length: 255 }).primaryKey(),
-  shareId: varchar("share_id", { length: 36 }).notNull(),
+  shareId: varchar("share_id", { length: 255 }).notNull(),
   attempts: bigint("attempts", { mode: "number" }).notNull().default(0),
   windowStartedAt: bigint("window_started_at", { mode: "number" }).notNull(),
   lastAttemptAt: bigint("last_attempt_at", { mode: "number" }).notNull(),
@@ -7557,6 +7557,17 @@ var ShareService = class {
     if (!revoked) {
       throw new AppError("share_item_inaccessible", 404);
     }
+    await this.shareRepository.insertAuditEvent({
+      id: createId("share-audit"),
+      shareId,
+      eventType: "revoked",
+      actorType: "owner",
+      eventAt: now,
+      ownerId,
+      ipHash: null,
+      userAgentHash: null,
+      metadata: toMetadata({ revokedAt: now })
+    });
     const revokedShare = {
       ...share2,
       revokedAt: now
@@ -7783,11 +7794,13 @@ share.post("/", authMiddleware, async (c) => {
   }
   const publicOrigin = c.env.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
   const service = getService3(c);
+  const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : void 0;
+  const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : void 0;
   const share2 = await service.createShareForOwner({
     ownerId,
     vaultItemId: body.vaultItemId,
-    ttlSeconds: typeof body.ttlSeconds === "number" ? body.ttlSeconds : void 0,
-    expiresAt: typeof body.expiresAt === "number" ? body.expiresAt : void 0,
+    ttlSeconds,
+    expiresAt,
     publicOrigin
   });
   return c.json({ success: true, share: share2 });
@@ -8737,7 +8750,7 @@ var MIGRATIONS = [
             );
             CREATE TABLE IF NOT EXISTS share_rate_limits (
                 \`key\` VARCHAR(255) PRIMARY KEY,
-                share_id VARCHAR(36) NOT NULL,
+                share_id VARCHAR(255) NOT NULL,
                 attempts BIGINT DEFAULT 0,
                 window_started_at BIGINT NOT NULL,
                 last_attempt_at BIGINT NOT NULL,
