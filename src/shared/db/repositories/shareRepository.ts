@@ -59,6 +59,34 @@ export class ShareRepository {
         return true;
     }
 
+    async revokeActiveForOwnerVaultItem(ownerId: string, vaultItemId: string, revokedAt: number): Promise<ShareLink[]> {
+        const activeShares = await this.db
+            .select()
+            .from(shareLinks)
+            .where(and(
+                eq(shareLinks.ownerId, ownerId),
+                eq(shareLinks.vaultItemId, vaultItemId),
+                isNull(shareLinks.revokedAt),
+                gt(shareLinks.expiresAt, revokedAt),
+            ));
+
+        if (activeShares.length === 0) {
+            return [];
+        }
+
+        await this.db
+            .update(shareLinks)
+            .set({ revokedAt })
+            .where(and(
+                eq(shareLinks.ownerId, ownerId),
+                eq(shareLinks.vaultItemId, vaultItemId),
+                isNull(shareLinks.revokedAt),
+                gt(shareLinks.expiresAt, revokedAt),
+            ));
+
+        return activeShares;
+    }
+
     async markAccessed(id: string, accessedAt: number): Promise<void> {
         await this.db
             .update(shareLinks)

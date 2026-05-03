@@ -4,6 +4,8 @@ vi.mock('drizzle-orm', async () => {
     const actual = await vi.importActual<any>('drizzle-orm');
     return {
         ...actual,
+        and: vi.fn((...conditions) => conditions),
+        eq: vi.fn((column, value) => ({ column, value, operator: 'eq' })),
         lte: vi.fn(() => 'lte-cond'),
         lt: vi.fn(() => 'lt-cond'),
         gt: vi.fn(() => 'gt-cond'),
