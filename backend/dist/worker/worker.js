@@ -8836,7 +8836,10 @@ var worker_default = {
       ...env,
       DB: db
     };
-    ctx.waitUntil(handleScheduledBackup(specializedEnv));
+    ctx.waitUntil(Promise.all([
+      handleScheduledBackup(specializedEnv),
+      createShareService(specializedEnv).cleanupShareState()
+    ]));
   }
 };
 export {

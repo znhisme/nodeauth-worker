@@ -8969,6 +8969,8 @@ async function migrateDatabase(db) {
 
 // ../src/app/netlify.ts
 var cachedDb = null;
+var SHARE_CLEANUP_INTERVAL_MS = 60 * 60 * 1e3;
+var lastShareCleanupAt = 0;
 var handler = async (event, context) => {
   try {
     if (!cachedDb) {
@@ -8990,6 +8992,23 @@ var handler = async (event, context) => {
           statusCode: 503,
           body: JSON.stringify({ success: false, error: "Database Initialization Failed", detail: err.message })
         };
+      }
+    }
+    const now = Date.now();
+    if (cachedDb?.db && now - lastShareCleanupAt >= SHARE_CLEANUP_INTERVAL_MS) {
+      lastShareCleanupAt = now;
+      try {
+        const result = await createShareService({
+          ...process.env,
+          ...context,
+          DB: cachedDb.db
+        }).cleanupShareState(now);
+        console.log("[Share Cleanup] Completed", {
+          expiredSharesMarked: result.expiredSharesMarked,
+          staleRateLimitRowsDeleted: result.staleRateLimitRowsDeleted
+        });
+      } catch (err) {
+        console.error("[Share Cleanup] Failed:", err.message || err);
       }
     }
     const host = event.headers.host || event.headers["Host"] || "localhost";

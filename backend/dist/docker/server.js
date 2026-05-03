@@ -9163,6 +9163,16 @@ cron.schedule("0 2 * * *", async () => {
   } catch (e) {
     logger.error("[Cron] Backup failed:", e);
   }
+  try {
+    logger.info("[Cron] Triggering share cleanup...");
+    const result = await createShareService(envTemplate).cleanupShareState();
+    logger.info("[Cron] Share cleanup completed:", {
+      expiredSharesMarked: result.expiredSharesMarked,
+      staleRateLimitRowsDeleted: result.staleRateLimitRowsDeleted
+    });
+  } catch (e) {
+    logger.error("[Cron] Share cleanup failed:", e);
+  }
 });
 var port = parseInt(process.env.PORT || "3000", 10);
 logger.error(`[Docker Server] Starting NodeAuth on port ${port}...`);
