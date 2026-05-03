@@ -15,6 +15,7 @@ import backupRoutes from '@/features/backup/backupRoutes';
 import telegramRoutes from '@/features/telegram/telegramRoutes';
 import toolsRoutes from '@/features/tools/toolsRoutes';
 import shareRoutes from '@/features/share/shareRoutes';
+import { renderSharePublicPage } from '@/features/share/sharePublicPage';
 import healthRoutes from '@/features/health/healthRoutes';
 import emergencyRoutes from '@/features/emergency/emergencyRoutes';
 import wcProxyRoutes from '@/features/auth/wcProxyRoutes';
@@ -107,7 +108,7 @@ app.use('*', async (c, next) => {
         xContentTypeOptions: 'nosniff',
         xFrameOptions: 'DENY',
         xXssProtection: '1; mode=block',
-        referrerPolicy: 'strict-origin-when-cross-origin',
+        referrerPolicy: c.req.path.startsWith('/share/') ? 'no-referrer' : 'strict-origin-when-cross-origin',
         contentSecurityPolicy: csp,
     })(c, next);
 });
@@ -161,7 +162,12 @@ app.all('/api/*', (c) => {
     return c.json({ success: false, error: 'API Not Found' }, 404);
 });
 
-// 3.2 静态前端资源 (适配 Docker & Cloudflare)
+// 3.2 公共分享访问页：不依赖登录态或 Vue 路由，避免分享链接落到空 SPA shell。
+app.get('/share/:token', (c) => {
+    return renderSharePublicPage(c.req.param('token'));
+});
+
+// 3.3 静态前端资源 (适配 Docker & Cloudflare)
 app.get('*', async (c) => {
     // 仅在 Cloudflare 环境下尝试通过 ASSETS 绑定读取资源
     if (c.env && (c.env as any).ASSETS) {

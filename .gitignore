@@ -40,3 +40,4 @@ npm-debug.log*
 .actrc
 .event
 .example/
+.playwright-cli/

@@ -30,9 +30,37 @@ describe('share route mounting', () => {
         const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf8');
 
         expect(source).toContain("import shareRoutes from '@/features/share/shareRoutes';");
+        expect(source).toContain("import { renderSharePublicPage } from '@/features/share/sharePublicPage';");
         expect(source).toContain("app.route('/api/share', shareRoutes);");
         expect(source.indexOf("app.route('/api/share', shareRoutes);"))
             .toBeLessThan(source.indexOf("app.all('/api/*'"));
+        expect(source.indexOf("app.get('/share/:token'"))
+            .toBeLessThan(source.indexOf("app.get('*'"));
+    });
+
+    it('serves a public recipient page for generated /share/:token URLs', async () => {
+        const response = await app.fetch(new Request('https://nodeauth.example/share/raw-token-123'), {
+            ASSETS: {
+                fetch: async () => new Response('unexpected fallback', { status: 500 }),
+            },
+        } as any);
+        const html = await response.text();
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get('Content-Type')).toContain('text/html');
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+        expect(response.headers.get('X-Robots-Tag')).toContain('noindex');
+        expect(html).toContain('共享账户访问');
+        expect(html).toContain('/api/share/public/');
+        expect(html).toContain('/access');
+        expect(html).toContain('raw-token-123');
+    });
+
+    it('routes public share pages through the Worker before Cloudflare Assets SPA fallback', () => {
+        const wrangler = readFileSync(new URL('../../wrangler.toml', import.meta.url), 'utf8');
+
+        expect(wrangler).toMatch(/run_worker_first\s*=\s*\[[^\]]*"\/share\/\*"/);
     });
 });
 
