@@ -1,6 +1,6 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-B1iRy_WF.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh0klhaa.js","assets/element-plus-Dh61In7b.css","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-c6243024.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh0klhaa.js","assets/element-plus-Dh61In7b.css","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css"])))=>i.map(i=>d[i]);
 import { _ as z, __tla as __tla_0 } from "./pdf-utils-r4RjNe6V.js";
-import { n as F, y as Q, z as B, B as L, l as D, r as g, b as G, C as w, u as K, s as q, g as W, D as b, a as M, __tla as __tla_1 } from "./index-B1iRy_WF.js";
+import { n as F, y as Q, z as B, B as L, l as D, r as g, b as G, C as w, u as K, s as q, g as W, D as b, a as M, __tla as __tla_1 } from "./index-c6243024.js";
 import { l as x, __tla as __tla_2 } from "./resourceRegistry-BAWP-Piz.js";
 import { f as X, e as N } from "./vue-core-Daban9YF.js";
 let pt, ht, dt, ft, et, nt, at, ot, st;
@@ -288,7 +288,7 @@ let __tla = Promise.all([
             const t = await g("/api/vault/trash");
             try {
                 const { useLayoutStore: n } = await z(async ()=>{
-                    const { useLayoutStore: o } = await import("./index-B1iRy_WF.js").then(async (m)=>{
+                    const { useLayoutStore: o } = await import("./index-c6243024.js").then(async (m)=>{
                         await m.__tla;
                         return m;
                     }).then((i)=>i.M);
@@ -395,7 +395,7 @@ let __tla = Promise.all([
     $ = async (t)=>{
         if (t && t.secret && !t.secret.startsWith("nodeauth:")) {
             const { useAppLockStore: n } = await z(async ()=>{
-                const { useAppLockStore: s } = await import("./index-B1iRy_WF.js").then(async (m)=>{
+                const { useAppLockStore: s } = await import("./index-c6243024.js").then(async (m)=>{
                     await m.__tla;
                     return m;
                 }).then((o)=>o.Q);
@@ -405,7 +405,7 @@ let __tla = Promise.all([
             }, __vite__mapDeps([0,1,2,3,4,5,6,7,8])), r = await n().getMaskingKey();
             if (r) {
                 const { maskSecretFront: s } = await z(async ()=>{
-                    const { maskSecretFront: o } = await import("./index-B1iRy_WF.js").then(async (m)=>{
+                    const { maskSecretFront: o } = await import("./index-c6243024.js").then(async (m)=>{
                         await m.__tla;
                         return m;
                     }).then((i)=>i.P);
@@ -721,7 +721,7 @@ let __tla = Promise.all([
                                     status: "conflict"
                                 });
                                 const { useOfflineStore: m } = await z(async ()=>{
-                                    const { useOfflineStore: y } = await import("./index-B1iRy_WF.js").then(async (m)=>{
+                                    const { useOfflineStore: y } = await import("./index-c6243024.js").then(async (m)=>{
                                         await m.__tla;
                                         return m;
                                     }).then((T)=>T.N);
