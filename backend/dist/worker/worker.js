@@ -3948,8 +3948,8 @@ var VaultRepository = class {
    * 批量更新排序 (高性能版 - CASE WHEN 批量 SQL)
    *
    * 旧实现：N 次串行 UPDATE，每次一个 DB 往返 → 8474 条记录需要 30+ 秒
-   * 新实现：每批 30 条合并为 1 条 CASE WHEN SQL → 减少频繁网络开销，同时规避上限
-   *
+   * 新实现：每批 30 条合并为 1 条 CASE WHEN SQL → 减少频繁网络开销，同时规避上限 
+   * 
    * 分批原因：虽然 SQLite 默认参数上限为 999 个，但 **Cloudflare D1 硬性限制每条执行语句最多只能有 100 个绑定参数**！
    *   每条记录在此 CASE WHEN 结构中占用 3 个参数 (WHEN id / THEN sortOrder / WHERE IN id)
    *   33 乘以 3 = 99，所以安全分批大小最大为 33，此处使用 30 留有余量。
@@ -6398,14 +6398,14 @@ backups.get("/oauth/google/callback", async (c) => {
             <div id="status">\u6388\u6743\u6210\u529F\uFF0C\u6B63\u5728\u8FD4\u56DE\u5E94\u7528...</div>
             <script>
                 (function() {
-                    const message = {
-                        type: 'GDRIVE_AUTH_SUCCESS',
+                    const message = { 
+                        type: 'GDRIVE_AUTH_SUCCESS', 
                         refreshToken: ${JSON.stringify(refreshToken)}
                     };
-
+                    
                     function transmit() {
                         const success = !!window.opener;
-
+                        
                         // 1. \u5C1D\u8BD5 postMessage (\u4F20\u7EDF\u65B9\u5F0F)
                         if (window.opener) {
                             window.opener.postMessage(message, '*');
@@ -6429,7 +6429,7 @@ backups.get("/oauth/google/callback", async (c) => {
                                 }
                             };
                         } catch (e) {}
-
+                        
                         return success;
                     }
 
@@ -8298,6 +8298,20 @@ app.all("/api/*", (c) => {
 app.get("*", async (c) => {
   if (c.env && c.env.ASSETS) {
     const res = await c.env.ASSETS.fetch(c.req.raw);
+    const path = c.req.path;
+    const contentType = res.headers.get("content-type") || "";
+    const isStaticAsset = path.startsWith("/assets/") || path === "/sw.js" || /\.(js|mjs|css|png|jpg|jpeg|gif|svg|ico|webmanifest|wasm|json|woff2?|ttf|map)$/i.test(path);
+    if (isStaticAsset && contentType.includes("text/html")) {
+      logger.warn(`[Static] Prevented SPA fallback for missing asset: ${path}`);
+      return new Response("Asset Not Found", {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-NodeAuth-Source": "Missing-Static-Asset"
+        }
+      });
+    }
     return new Response(res.body, res);
   }
   return c.json({ success: false, error: "Not Found" }, 404);

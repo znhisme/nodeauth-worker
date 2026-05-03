@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { redactSharePublicToken, resolveApiCorsOrigin } from '@/app/index';
+import app, { redactSharePublicToken, resolveApiCorsOrigin } from '@/app/index';
 
 describe('redactSharePublicToken', () => {
     it('redacts public share access tokens from logged request paths', () => {
@@ -33,6 +33,24 @@ describe('share route mounting', () => {
         expect(source).toContain("app.route('/api/share', shareRoutes);");
         expect(source.indexOf("app.route('/api/share', shareRoutes);"))
             .toBeLessThan(source.indexOf("app.all('/api/*'"));
+    });
+});
+
+describe('static asset fallback guard', () => {
+    it('does not return SPA fallback HTML for missing JavaScript assets', async () => {
+        const response = await app.fetch(new Request('https://nodeauth.example/assets/missing.js'), {
+            ASSETS: {
+                fetch: async () => new Response('<!doctype html><html></html>', {
+                    status: 200,
+                    headers: { 'Content-Type': 'text/html; charset=utf-8' },
+                }),
+            },
+        } as any);
+
+        expect(response.status).toBe(404);
+        expect(response.headers.get('Content-Type')).toContain('text/plain');
+        expect(response.headers.get('Cache-Control')).toBe('no-store');
+        expect(response.headers.get('X-NodeAuth-Source')).toBe('Missing-Static-Asset');
     });
 });
 

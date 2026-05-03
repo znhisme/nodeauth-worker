@@ -166,6 +166,24 @@ app.get('*', async (c) => {
     // 仅在 Cloudflare 环境下尝试通过 ASSETS 绑定读取资源
     if (c.env && (c.env as any).ASSETS) {
         const res = await (c.env as any).ASSETS.fetch(c.req.raw);
+        const path = c.req.path;
+        const contentType = res.headers.get('content-type') || '';
+        const isStaticAsset = path.startsWith('/assets/')
+            || path === '/sw.js'
+            || /\.(js|mjs|css|png|jpg|jpeg|gif|svg|ico|webmanifest|wasm|json|woff2?|ttf|map)$/i.test(path);
+
+        if (isStaticAsset && contentType.includes('text/html')) {
+            logger.warn(`[Static] Prevented SPA fallback for missing asset: ${path}`);
+            return new Response('Asset Not Found', {
+                status: 404,
+                headers: {
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Cache-Control': 'no-store',
+                    'X-NodeAuth-Source': 'Missing-Static-Asset',
+                },
+            });
+        }
+
         return new Response(res.body, res);
     }
     // 非 Cloudflare 环境下，404 处理交给 Netlify/Docker 的宿主逻辑
