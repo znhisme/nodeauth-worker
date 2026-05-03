@@ -37,6 +37,22 @@ const makeShareRecord = (overrides: any = {}) => ({
     ...overrides,
 });
 
+const makeMetadataShareForBatch = (shareId: string, vaultItemId: string) => ({
+    id: shareId,
+    item: {
+        id: vaultItemId,
+        service: `Service ${vaultItemId}`,
+        account: `${vaultItemId}@example.com`,
+    },
+    status: 'active',
+    createdAt: '3000',
+    expiresAt: '5000',
+    revokedAt: null,
+    lastAccessedAt: null,
+    accessCount: 0,
+    publicUrl: `https://shares.example/share/raw-token-${vaultItemId}`,
+});
+
 const expectRecipientSafeDecision = (decision: any) => {
     const serialized = JSON.stringify(decision);
     expect(serialized).not.toContain('ownerId');
@@ -272,6 +288,134 @@ describe('ShareService', () => {
             'publicUrl',
             'fullUrl',
         ]);
+    });
+
+    it('batch creates shares in request order and returns one-time secrets for every successful row', async () => {
+        const now = 3000;
+        const serviceSpy = vi.spyOn(service, 'createShareForOwner');
+        serviceSpy
+            .mockResolvedValueOnce({
+                ...makeMetadataShareForBatch('share-1', 'vault-1'),
+                rawToken: 'raw-token-1',
+                rawAccessCode: 'code-1',
+            } as any)
+            .mockResolvedValueOnce({
+                ...makeMetadataShareForBatch('share-2', 'vault-2'),
+                rawToken: 'raw-token-2',
+                rawAccessCode: 'code-2',
+            } as any);
+
+        const result = await service.createSharesForOwnerBatch({
+            ownerId: 'owner-1',
+            vaultItemIds: ['vault-1', 'vault-2'],
+            ttlSeconds: 3600,
+            publicOrigin: 'https://shares.example',
+            now,
+        });
+
+        expect(result.failures).toEqual([]);
+        expect(result.successes.map((row: any) => row.requestIndex)).toEqual([0, 1]);
+        expect(result.successes.map((row: any) => row.share.rawToken)).toEqual(['raw-token-1', 'raw-token-2']);
+        expect(result.successes.map((row: any) => row.share.rawAccessCode)).toEqual(['code-1', 'code-2']);
+        expect(serviceSpy).toHaveBeenNthCalledWith(1, {
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            ttlSeconds: 3600,
+            expiresAt: undefined,
+            now,
+            publicOrigin: 'https://shares.example',
+        });
+        expect(serviceSpy).toHaveBeenNthCalledWith(2, {
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-2',
+            ttlSeconds: 3600,
+            expiresAt: undefined,
+            now,
+            publicOrigin: 'https://shares.example',
+        });
+    });
+
+    it('batch preserves request indices for mixed success and failure rows', async () => {
+        const now = 3000;
+        const serviceSpy = vi.spyOn(service, 'createShareForOwner');
+        serviceSpy
+            .mockResolvedValueOnce({
+                ...makeMetadataShareForBatch('share-1', 'vault-1'),
+                rawToken: 'raw-token-1',
+                rawAccessCode: 'code-1',
+            } as any)
+            .mockRejectedValueOnce(new AppError('share_item_inaccessible', 404))
+            .mockResolvedValueOnce({
+                ...makeMetadataShareForBatch('share-3', 'vault-3'),
+                rawToken: 'raw-token-3',
+                rawAccessCode: 'code-3',
+            } as any);
+
+        const result = await service.createSharesForOwnerBatch({
+            ownerId: 'owner-1',
+            vaultItemIds: ['vault-1', 'vault-inaccessible', 'vault-3'],
+            expiresAt: 5000,
+            now,
+            publicOrigin: 'https://shares.example',
+        });
+
+        expect(result.successes.map((row: any) => row.requestIndex)).toEqual([0, 2]);
+        expect(result.failures).toEqual([
+            {
+                requestIndex: 1,
+                error: 'could_not_create_share',
+            },
+        ]);
+        expect(serviceSpy).toHaveBeenCalledTimes(3);
+        expect(serviceSpy).toHaveBeenNthCalledWith(2, {
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-inaccessible',
+            ttlSeconds: undefined,
+            expiresAt: 5000,
+            now,
+            publicOrigin: 'https://shares.example',
+        });
+    });
+
+    it('batch failure rows do not expose inaccessible item or diagnostic data', async () => {
+        const serviceSpy = vi.spyOn(service, 'createShareForOwner');
+        serviceSpy.mockRejectedValueOnce(new Error('GitHub owner@example.com tokenHash accessCodeHash password seed stack trace'));
+
+        const result = await service.createSharesForOwnerBatch({
+            ownerId: 'owner-1',
+            vaultItemIds: ['vault-inaccessible'],
+            now: 3000,
+            publicOrigin: 'https://shares.example',
+        });
+
+        expect(result).toEqual({
+            successes: [],
+            failures: [
+                {
+                    requestIndex: 0,
+                    error: 'could_not_create_share',
+                },
+            ],
+        });
+
+        const serialized = JSON.stringify(result);
+        for (const forbidden of [
+            'vault-inaccessible',
+            'owner-1',
+            'owner@example.com',
+            'GitHub',
+            'tokenHash',
+            'accessCodeHash',
+            'password',
+            'secret',
+            'seed',
+            'otpauth',
+            'stack',
+            'trace',
+            'https://shares.example',
+        ]) {
+            expect(serialized).not.toContain(forbidden);
+        }
     });
 
     it('serializes owner metadata without forbidden secret fields and with descending status coverage', async () => {
