@@ -6,6 +6,7 @@ vi.mock('drizzle-orm', async () => {
         ...actual,
         lte: vi.fn(() => 'lte-cond'),
         lt: vi.fn(() => 'lt-cond'),
+        gt: vi.fn(() => 'gt-cond'),
         isNull: vi.fn(() => 'is-null-cond'),
         count: vi.fn(() => 'count-sql'),
     };
@@ -27,11 +28,16 @@ function createDbMock() {
     const deleteWhere = vi.fn().mockResolvedValue({ success: true });
     const deleteFn = vi.fn(() => ({ where: deleteWhere }));
 
+    const updateWhere = vi.fn().mockResolvedValue({ success: true });
+    const updateSet = vi.fn(() => ({ where: updateWhere }));
+    const update = vi.fn(() => ({ set: updateSet }));
+
     return {
         db: {
             select,
             insert,
             delete: deleteFn,
+            update,
         },
         select,
         selectFrom,
@@ -41,6 +47,9 @@ function createDbMock() {
         insertValues,
         deleteFn,
         deleteWhere,
+        update,
+        updateSet,
+        updateWhere,
     };
 }
 
@@ -137,5 +146,41 @@ describe('ShareRepository cleanup primitives', () => {
         expect(mock.deleteWhere).toHaveBeenCalledTimes(1);
         expect(JSON.stringify({ deletedCount })).not.toContain('share-1');
         expect(JSON.stringify({ deletedCount })).not.toContain('rate-1');
+    });
+
+    it('revokeActiveForOwnerVaultItem revokes only active owner and vault shares and returns selected rows', async () => {
+        const mock = createDbMock();
+        const activeRows = [
+            {
+                id: 'share-active-1',
+                ownerId: 'owner-1',
+                vaultItemId: 'vault-1',
+                tokenHash: 'token-hash',
+                accessCodeHash: 'access-hash',
+                expiresAt: 3000,
+                revokedAt: null,
+                createdAt: 1000,
+                lastAccessedAt: null,
+                accessCount: 0,
+            },
+        ];
+        mock.selectWhere.mockResolvedValue(activeRows);
+
+        const repo = new ShareRepository(mock.db as any);
+
+        const result = await repo.revokeActiveForOwnerVaultItem('owner-1', 'vault-1', 2000);
+
+        expect(result).toBe(activeRows);
+        expect(mock.select).toHaveBeenCalledTimes(1);
+        expect(mock.selectFrom).toHaveBeenCalledWith(shareLinks);
+        expect(mock.update).toHaveBeenCalledWith(shareLinks);
+        expect(mock.updateSet).toHaveBeenCalledWith({ revokedAt: 2000 });
+        expect(mock.updateWhere).toHaveBeenCalledTimes(1);
+        expect(drizzle.eq).toHaveBeenCalledWith(shareLinks.ownerId, 'owner-1');
+        expect(drizzle.eq).toHaveBeenCalledWith(shareLinks.vaultItemId, 'vault-1');
+        expect(drizzle.isNull).toHaveBeenCalledWith(shareLinks.revokedAt);
+        expect(drizzle.gt).toHaveBeenCalledWith(shareLinks.expiresAt, 2000);
+        expect(JSON.stringify(mock.updateSet.mock.calls[0][0])).not.toContain('token-hash');
+        expect(JSON.stringify(mock.updateSet.mock.calls[0][0])).not.toContain('access-hash');
     });
 });
