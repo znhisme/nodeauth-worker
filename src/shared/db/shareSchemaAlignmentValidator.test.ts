@@ -55,7 +55,7 @@ const fixedMysqlBlock = `
     );
     CREATE TABLE IF NOT EXISTS share_rate_limits (
         key VARCHAR(255) PRIMARY KEY,
-        share_id VARCHAR(36) NOT NULL,
+        share_id VARCHAR(255) NOT NULL,
         attempts BIGINT DEFAULT 0,
         window_started_at BIGINT NOT NULL,
         last_attempt_at BIGINT NOT NULL,
@@ -137,6 +137,13 @@ describe('share schema alignment validator', () => {
 
     it('fails when the MySQL share migration is missing required bounded varchar definitions', () => {
         const result = runValidator(fixedMysqlBlock.replace('token_hash VARCHAR(255) NOT NULL,', ''));
+
+        expect(result.status).not.toBe(0);
+        expect(result.stderr).toContain('Missing MySQL share migration string');
+    });
+
+    it('fails when the MySQL share rate limiter keeps the legacy share_id width', () => {
+        const result = runValidator(fixedMysqlBlock.replace('share_id VARCHAR(255) NOT NULL', 'share_id VARCHAR(36) NOT NULL'));
 
         expect(result.status).not.toBe(0);
         expect(result.stderr).toContain('Missing MySQL share migration string');
