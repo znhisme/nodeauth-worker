@@ -93,7 +93,7 @@ Plans:
 **Plans:** 3 plans
 
 Plans:
-- [ ] 04-01-PLAN.md — Enforce backend latest-share-wins for owner account shares.
+- [x] 04-01-PLAN.md — Enforce backend latest-share-wins for owner account shares.
 - [ ] 04-02-PLAN.md — Add owner-safe batch share API semantics and privacy-allowlisted partial failures.
 - [ ] 04-03-PLAN.md — Regenerate backend runtime bundles and create the frontend source gate for Manage Shares UI work.
 **UI hint**: yes
