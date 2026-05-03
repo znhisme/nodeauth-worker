@@ -5,6 +5,7 @@ export const SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
 export const SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 export const SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1000;
+export const SHARE_RATE_LIMIT_RETENTION_MS = SHARE_RATE_LIMIT_WINDOW_MS + SHARE_RATE_LIMIT_LOCK_MS;
 
 export type ShareStatus = 'active' | 'expired' | 'revoked';
 export type ShareAuditEventType = 'created' | 'access_granted' | 'access_denied_threshold' | 'expired' | 'revoked';
@@ -113,6 +114,12 @@ export interface ShareRateLimitDecision {
     allowed: boolean;
     attempts: number;
     lockedUntil?: number | null;
+}
+
+export interface ShareCleanupResult {
+    expiredSharesMarked: number;
+    staleRateLimitRowsDeleted: number;
+    ranAt: number;
 }
 
 export interface ShareAccessDecision {

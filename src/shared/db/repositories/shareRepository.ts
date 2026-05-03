@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, isNull, lt, lte, sql } from 'drizzle-orm';
 import {
     shareAuditEvents,
     shareLinks,
@@ -71,6 +71,54 @@ export class ShareRepository {
 
     async insertAuditEvent(input: NewShareAuditEvent): Promise<void> {
         await this.db.insert(shareAuditEvents).values(input);
+    }
+
+    async findExpiredSharesForCleanup(now: number): Promise<ShareLink[]> {
+        return await this.db
+            .select()
+            .from(shareLinks)
+            .where(and(lte(shareLinks.expiresAt, now), isNull(shareLinks.revokedAt)));
+    }
+
+    async insertExpiredAuditEventIfMissing(share: ShareLink, eventAt: number): Promise<boolean> {
+        const existing = await this.db
+            .select({ count: count() })
+            .from(shareAuditEvents)
+            .where(and(eq(shareAuditEvents.shareId, share.id), eq(shareAuditEvents.eventType, 'expired')));
+
+        if (Number(existing[0]?.count || 0) > 0) {
+            return false;
+        }
+
+        await this.db.insert(shareAuditEvents).values({
+            id: `share-audit-${crypto.randomUUID()}`,
+            shareId: share.id,
+            eventType: 'expired',
+            actorType: 'system',
+            eventAt,
+            ownerId: share.ownerId,
+            ipHash: null,
+            userAgentHash: null,
+            metadata: JSON.stringify({
+                expiredAt: eventAt,
+                expiresAt: share.expiresAt,
+                status: 'expired',
+            }),
+        });
+
+        return true;
+    }
+
+    async deleteStaleRateLimits(cutoff: number): Promise<number> {
+        const conditions = lt(shareRateLimits.lastAttemptAt, cutoff);
+
+        const countRes = await this.db.select().from(shareRateLimits).where(conditions);
+
+        await this.db
+            .delete(shareRateLimits)
+            .where(conditions);
+
+        return countRes.length;
     }
 
     async enforceRateLimit(input: ShareRateLimitInput): Promise<ShareRateLimitDecision> {

@@ -75,6 +75,9 @@ describe('ShareService', () => {
             markAccessed: vi.fn(),
             insertAuditEvent: vi.fn(),
             enforceRateLimit: vi.fn(),
+            findExpiredSharesForCleanup: vi.fn(),
+            insertExpiredAuditEventIfMissing: vi.fn(),
+            deleteStaleRateLimits: vi.fn(),
         };
         service = new ShareService(
             { SHARE_SECRET_PEPPER: 'pepper', JWT_SECRET: 'jwt' } as any,
@@ -562,5 +565,63 @@ describe('ShareService', () => {
             .rejects.toMatchObject({ name: 'AppError', message: 'share_item_inaccessible', statusCode: 404 });
 
         expect(shareRepository.insertAuditEvent).not.toHaveBeenCalled();
+    });
+
+    it('cleanupShareState records expired shares and deletes stale rate-limit rows once', async () => {
+        const expiredShares = [
+            makeShareRecord({ id: 'share-1', expiresAt: 900 }),
+            makeShareRecord({ id: 'share-2', expiresAt: 800 }),
+        ];
+        shareRepository.findExpiredSharesForCleanup.mockResolvedValue(expiredShares);
+        shareRepository.insertExpiredAuditEventIfMissing
+            .mockResolvedValueOnce(true)
+            .mockResolvedValueOnce(false);
+        shareRepository.deleteStaleRateLimits.mockResolvedValue(3);
+
+        const result = await service.cleanupShareState(1700000000000);
+
+        expect(shareRepository.findExpiredSharesForCleanup).toHaveBeenCalledWith(1700000000000);
+        expect(shareRepository.insertExpiredAuditEventIfMissing).toHaveBeenNthCalledWith(1, expiredShares[0], 1700000000000);
+        expect(shareRepository.insertExpiredAuditEventIfMissing).toHaveBeenNthCalledWith(2, expiredShares[1], 1700000000000);
+        expect(shareRepository.deleteStaleRateLimits).toHaveBeenCalledWith(1699998200000);
+        expect(result).toEqual({
+            expiredSharesMarked: 1,
+            staleRateLimitRowsDeleted: 3,
+            ranAt: 1700000000000,
+        });
+    });
+
+    it('cleanupShareState returns a count-only idempotent shape without sensitive values', async () => {
+        shareRepository.findExpiredSharesForCleanup.mockResolvedValue([
+            makeShareRecord({
+                id: 'share-raw-public-token',
+                ownerId: 'owner@example.com',
+                vaultItemId: 'GitHub',
+                tokenHash: 'tokenHash',
+                accessCodeHash: 'accessCode',
+            }),
+        ]);
+        shareRepository.insertExpiredAuditEventIfMissing.mockResolvedValue(false);
+        shareRepository.deleteStaleRateLimits.mockResolvedValue(0);
+
+        const first = await service.cleanupShareState(1700000000000);
+        const second = await service.cleanupShareState(1700000000000);
+
+        expect(first).toEqual(second);
+        expect(Object.keys(first).sort()).toEqual(['expiredSharesMarked', 'ranAt', 'staleRateLimitRowsDeleted']);
+        const serialized = JSON.stringify(first);
+        for (const forbidden of [
+            'share-',
+            'raw-public-token',
+            'accessCode',
+            'tokenHash',
+            'owner@example.com',
+            'GitHub',
+            'password',
+            'seed',
+            'otpauth',
+        ]) {
+            expect(serialized).not.toContain(forbidden);
+        }
     });
 });

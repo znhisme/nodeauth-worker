@@ -20,9 +20,11 @@ import {
     type CreateShareResult,
     type ResolveShareAccessInput,
     type ShareAccessDecision,
+    type ShareCleanupResult,
     type ShareLinkRecord,
     SHARE_DEFAULT_TTL_SECONDS,
     SHARE_MAX_TTL_SECONDS,
+    SHARE_RATE_LIMIT_RETENTION_MS,
 } from '@/features/share/shareTypes';
 
 const textEncoder = new TextEncoder();
@@ -224,6 +226,27 @@ export class ShareService {
             userAgentHash: null,
             metadata: toMetadata({ revokedAt: now }),
         });
+    }
+
+    async cleanupShareState(now = Date.now()): Promise<ShareCleanupResult> {
+        const expiredShares = await this.shareRepository.findExpiredSharesForCleanup(now);
+        let expiredSharesMarked = 0;
+
+        for (const share of expiredShares) {
+            const inserted = await this.shareRepository.insertExpiredAuditEventIfMissing(share, now);
+            if (inserted) {
+                expiredSharesMarked += 1;
+            }
+        }
+
+        const staleRateLimitCutoff = now - SHARE_RATE_LIMIT_RETENTION_MS;
+        const staleRateLimitRowsDeleted = await this.shareRepository.deleteStaleRateLimits(staleRateLimitCutoff);
+
+        return {
+            expiredSharesMarked,
+            staleRateLimitRowsDeleted,
+            ranAt: now,
+        };
     }
 
     async resolveShareAccess(input: ResolveShareAccessInput): Promise<ShareAccessDecision> {
