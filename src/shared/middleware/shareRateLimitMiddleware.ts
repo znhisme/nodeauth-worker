@@ -25,6 +25,31 @@ function returnShareInaccessible(c: Context<{ Bindings: EnvBindings }>) {
     return c.json({ success: false, message: 'share_inaccessible', data: null }, 404);
 }
 
+function firstNonEmptyHeader(c: Context, name: string): string | null {
+    const value = c.req.header(name)?.trim();
+    return value || null;
+}
+
+export function resolveShareRateLimitClientIp(c: Context): string {
+    const cloudflareIp = firstNonEmptyHeader(c, 'CF-Connecting-IP');
+    if (cloudflareIp) {
+        return cloudflareIp;
+    }
+
+    const forwardedFor = c.req.header('x-forwarded-for')
+        ?.split(',')
+        .map((value) => value.trim())
+        .find(Boolean);
+    if (forwardedFor) {
+        return forwardedFor;
+    }
+
+    return firstNonEmptyHeader(c, 'x-real-ip')
+        || firstNonEmptyHeader(c, 'x-nf-client-connection-ip')
+        || firstNonEmptyHeader(c, 'client-ip')
+        || 'unknown';
+}
+
 export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }) => {
     return async (c: Context<{ Bindings: EnvBindings }>, next: Next) => {
         const db = c.env.DB;
@@ -41,7 +66,7 @@ export const shareRateLimit = (options?: { keyBuilder?: (c: Context) => string }
                 ? options.keyBuilder(c)
                 : [
                     'share',
-                    c.req.header('CF-Connecting-IP') || 'unknown',
+                    resolveShareRateLimitClientIp(c),
                     'share-public-access',
                     tokenHash,
                 ].filter(Boolean).join(':');
