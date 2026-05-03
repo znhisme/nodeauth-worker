@@ -78,6 +78,7 @@ const expectOwnerResponseIsSafe = (value: unknown, allowCreateSecrets = false) =
     expect(serialized).not.toContain('tokenHash');
     expect(serialized).not.toContain('accessCodeHash');
     expect(serialized).not.toContain('ownerId');
+    expect(serialized).not.toContain('session');
     expect(serialized).not.toContain('sessionId');
     expect(serialized).not.toContain('secret');
     expect(serialized).not.toContain('seed');
@@ -199,7 +200,7 @@ describe('Share link routes', () => {
         expect(body).toEqual({
             success: true,
             share: makeMetadataShare({ status: 'revoked', revokedAt: '2000' }),
-            message: 'Share link revoked',
+            message: 'Share link revoked. Future access is blocked, but NodeAuth cannot retract credentials already viewed or copied.',
         });
         expect(mocks.revokeShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1');
         expectOwnerResponseIsSafe(body);
@@ -299,8 +300,19 @@ describe('Share link routes', () => {
 
         expect(response.status).toBe(404);
         expect(body).toEqual({ success: false, message: 'share_inaccessible', data: null });
-        expect(JSON.stringify(body)).not.toContain('revoked');
-        expect(JSON.stringify(body)).not.toContain('wrong-code');
+        const serialized = JSON.stringify(body);
+        for (const forbidden of [
+            'revoked',
+            'expired',
+            'wrong-code',
+            'locked',
+            'deleted',
+            'already viewed',
+            'already copied',
+            'cannot retract',
+        ]) {
+            expect(serialized).not.toContain(forbidden);
+        }
         expectPublicHeaders(response);
     });
 });

@@ -55,7 +55,11 @@ share.delete('/:id', authMiddleware, async (c) => {
     const service = getService(c);
     const share = await service.revokeShareForOwner(ownerId, c.req.param('id'));
 
-    return c.json({ success: true, share, message: 'Share link revoked' });
+    return c.json({
+        success: true,
+        share,
+        message: 'Share link revoked. Future access is blocked, but NodeAuth cannot retract credentials already viewed or copied.',
+    });
 });
 
 share.post('/public/:token/access', shareRateLimit(), async (c) => {

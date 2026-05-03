@@ -16,6 +16,7 @@ This contract defines the security rules for single-account share links before a
 - The maximum TTL is 604800 seconds.
 - Expiration is enforced on read and on any access decision that resolves a share.
 - Expired shares are treated as inactive and must not reveal shared item content.
+- Expired shares and stale access-attempt records may be cleaned up automatically. Cleanup does not change whether copied credentials remain usable outside NodeAuth.
 
 ## Revocation Semantics
 
@@ -23,6 +24,9 @@ This contract defines the security rules for single-account share links before a
 - Revocation wins over any remaining TTL.
 - Revoked shares must not be usable for access, token lookup, or code verification.
 - Revocation state is authoritative even if derived secrets remain present in storage.
+- Revocation stops future access to the link.
+- Revocation cannot retract passwords, OTP codes, account details, or other credential data already viewed or copied by a recipient.
+- Owners should treat any previously accessed shared credentials as potentially copied outside NodeAuth's control.
 
 ## TOTP Disclosure
 
