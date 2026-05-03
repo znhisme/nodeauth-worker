@@ -318,17 +318,15 @@ expect(body).toEqual({
 | A2 | Netlify opportunistic cleanup is acceptable if a dedicated scheduled function is not added in Phase 3. | Common Pitfalls | Netlify stale state may persist during no-traffic periods. |
 | A3 | Stale `share_rate_limits` retention can use a conservative cutoff based on last attempt plus limiter window/lock duration. | Architecture Patterns | Product may require longer forensic retention for rate-limit evidence. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Should expired shares get a durable `expired_at` marker?**  
    - What we know: Owner status can already be derived from `expires_at`, and expired audit events exist. [VERIFIED: `shareService.ts`, `shareTypes.ts`]  
-   - What's unclear: Whether the owner API needs a persisted "marked expired" state or only cleanup/audit behavior. [ASSUMED]  
-   - Recommendation: Avoid schema change unless duplicate-expiration audit suppression requires it. [ASSUMED]
+   - RESOLVED: Phase 03 plans and execution avoided an `expired_at` schema change. Expired status remains derived from `expires_at`, while cleanup uses idempotent expired audit insertion and stale limiter deletion below the route layer. [VERIFIED: `03-01-SUMMARY.md`, `03-02-SUMMARY.md`, `src/shared/db/repositories/shareRepository.ts`, `src/features/share/shareService.ts`]
 
 2. **Should Netlify use a real Scheduled Function or opportunistic cleanup only?**  
    - What we know: Netlify docs support scheduled functions, and current checkout only has `backend/dist/netlify/api.mjs` generated from `src/app/netlify.ts`. [VERIFIED: `src/app/netlify.ts`; CITED: Netlify docs]  
-   - What's unclear: Whether adding generated Netlify scheduled output is acceptable in this distribution structure. [ASSUMED]  
-   - Recommendation: Prefer opportunistic cleanup unless the planner can extend the Netlify build script cleanly. [ASSUMED]
+   - RESOLVED: Phase 03 uses an hourly warm-instance opportunistic cleanup guard in `src/app/netlify.ts` instead of adding separate Netlify scheduled-function plumbing to this distribution checkout. [VERIFIED: `03-02-SUMMARY.md`, `src/app/netlify.ts`]
 
 ## Environment Availability
 
