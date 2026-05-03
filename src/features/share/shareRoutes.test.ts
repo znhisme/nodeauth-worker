@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { HonoRequest } from 'hono/request';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EnvBindings } from '@/app/config';
 
@@ -161,6 +162,75 @@ describe('Share link routes', () => {
             publicOrigin: 'https://shares.example',
         });
         expectOwnerResponseIsSafe(body, true);
+    });
+
+    it('POST /api/share strips non-finite ttlSeconds and expiresAt before creating a share', async () => {
+        mocks.createShareForOwner.mockResolvedValue({
+            ...makeMetadataShare(),
+            rawToken: 'raw-token-123',
+            rawAccessCode: 'code-123',
+        });
+        const jsonSpy = vi.spyOn(HonoRequest.prototype, 'json').mockResolvedValueOnce({
+            vaultItemId: 'vault-1',
+            ttlSeconds: Number.NaN,
+            expiresAt: Number.NaN,
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share', {
+            method: 'POST',
+            body: '{}',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, {
+            NODEAUTH_PUBLIC_ORIGIN: 'https://shares.example',
+        } as any);
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.success).toBe(true);
+        expect(mocks.createShareForOwner).toHaveBeenCalledWith({
+            ownerId: 'owner@example.com',
+            vaultItemId: 'vault-1',
+            ttlSeconds: undefined,
+            expiresAt: undefined,
+            publicOrigin: 'https://shares.example',
+        });
+        expectOwnerResponseIsSafe(body, true);
+        jsonSpy.mockRestore();
+    });
+
+    it('POST /api/share forwards finite ttlSeconds and expiresAt unchanged', async () => {
+        mocks.createShareForOwner.mockResolvedValue({
+            ...makeMetadataShare(),
+            rawToken: 'raw-token-123',
+            rawAccessCode: 'code-123',
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share', {
+            method: 'POST',
+            body: JSON.stringify({
+                vaultItemId: 'vault-1',
+                ttlSeconds: 3600,
+                expiresAt: 4600,
+            }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, {
+            NODEAUTH_PUBLIC_ORIGIN: 'https://shares.example',
+        } as any);
+
+        expect(response.status).toBe(200);
+        expect(mocks.createShareForOwner).toHaveBeenCalledWith({
+            ownerId: 'owner@example.com',
+            vaultItemId: 'vault-1',
+            ttlSeconds: 3600,
+            expiresAt: 4600,
+            publicOrigin: 'https://shares.example',
+        });
     });
 
     it('POST /api/share rejects missing vaultItemId', async () => {
