@@ -71,10 +71,10 @@ Plans:
   5. Existing auth, vault, backup, health, and deployment behavior continues to work after share-link API support is added.
 **Plans**: 6 plans
 Plans:
-- [ ] 03-01-PLAN.md — Add source-level expired-share and stale-limiter cleanup primitives.
+- [x] 03-01-PLAN.md — Add source-level expired-share and stale-limiter cleanup primitives.
 - [ ] 03-02-PLAN.md — Wire cleanup into Worker, Docker, and Netlify runtime paths.
-- [ ] 03-03-PLAN.md — Document and expose truthful revocation limitation semantics.
-- [ ] 03-04-PLAN.md — Fix MySQL share migration compatibility and run blocking schema/build validation.
+- [x] 03-03-PLAN.md — Document and expose truthful revocation limitation semantics.
+- [x] 03-04-PLAN.md — Fix MySQL share migration compatibility and run blocking schema/build validation.
 - [ ] 03-05-PLAN.md — Expand public share security and privacy hardening tests.
 - [ ] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
 **UI hint**: yes
