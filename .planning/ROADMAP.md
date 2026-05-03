@@ -87,13 +87,15 @@ Plans:
 
 ### Phase 4: 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Owners can manage single-account share links from a maintainable UI path when editable frontend source is restored, while backend source now guarantees latest-share-wins and owner-safe batch sharing semantics for that UI.
+**Requirements**: PH4-BE-01, PH4-BE-02, PH4-BUILD-01, PH4-UI-01, PH4-UI-02, PH4-SEC-01
 **Depends on:** Phase 3
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 4 to break down)
+- [ ] 04-01-PLAN.md — Enforce backend latest-share-wins for owner account shares.
+- [ ] 04-02-PLAN.md — Add owner-safe batch share API semantics and privacy-allowlisted partial failures.
+- [ ] 04-03-PLAN.md — Regenerate backend runtime bundles and create the frontend source gate for Manage Shares UI work.
 **UI hint**: yes
 
 ## Progress
@@ -106,7 +108,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Foundation and Security Primitives | 7/7 | Complete | 2026-05-02 |
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
 | 3. Cleanup, Compatibility, and Hardening | 11/11 | Complete | 2026-05-03 |
-| 4. 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享 | 0/0 | Not planned | - |
+| 4. 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享 | 0/3 | Planned | - |
 
 ## Requirement Coverage
 
