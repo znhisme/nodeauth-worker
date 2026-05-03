@@ -78,7 +78,7 @@ Plans:
 - [x] 03-05-PLAN.md — Expand public share security and privacy hardening tests.
 - [x] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
 - [x] 03-07-PLAN.md — Close public share rate-limit compatibility gap for Docker and Netlify client identifiers.
-- [ ] 03-08-PLAN.md — Widen MySQL share rate-limit identifiers and reject non-finite create input.
+- [x] 03-08-PLAN.md — Widen MySQL share rate-limit identifiers and reject non-finite create input.
 - [ ] 03-09-PLAN.md — Emit revocation audit events and regenerate backend bundles.
 **UI hint**: yes
 

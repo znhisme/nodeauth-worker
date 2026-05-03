@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-cleanup-compatibility-and-hardening-07-PLAN.md
-last_updated: "2026-05-03T12:23:03.201Z"
-last_activity: 2026-05-03 -- Phase 03 planning complete
+stopped_at: Completed 03-cleanup-compatibility-and-hardening-08-PLAN.md
+last_updated: "2026-05-03T12:51:05.022Z"
+last_activity: 2026-05-03
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 22
-  completed_plans: 20
-  percent: 91
+  completed_plans: 21
+  percent: 95
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 ## Current Position
 
 Phase: 03 (cleanup-compatibility-and-hardening) — EXECUTING
-Plan: 7 of 7
+Plan: 2 of 9
 Status: Ready to execute
-Last activity: 2026-05-03 -- Phase 03 planning complete
+Last activity: 2026-05-03
 
-Progress: [██████████] 100%
+Progress: [██████████] 95%
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [██████████] 100%
 | Phase 02-share-link-api P05 | 6min | 2 tasks | 5 files |
 | Phase 02-share-link-api P06 | 5min | 3 tasks | 7 files |
 | Phase 03-cleanup-compatibility-and-hardening P07 | 5min | 2 tasks | 9 files |
+| Phase 03-cleanup-compatibility-and-hardening P08 | 7min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,8 @@ Recent decisions affecting current work:
 - [Phase 03-cleanup-compatibility-and-hardening]: Treat forwarded client headers as limiter bucket inputs only, not recipient identity or audit attribution. — Forwarded headers can be spoofed outside trusted proxies, but this plan only uses them to avoid collapsing supported-runtime public share limiter buckets.
 - [Phase 03-cleanup-compatibility-and-hardening]: Preserve the exact share:<clientIdentifier>:share-public-access:<tokenHash> limiter key format while expanding runtime header support. — Existing repository enforcement and generated assertions depend on the key family while the compatibility gap only required client identifier resolution.
 - [Phase 03-cleanup-compatibility-and-hardening]: Leave .planning/source-provenance.md unchanged because source-map verification passed after regeneration. — The generated source maps matched restored source and provenance after rebuilding Worker Docker and Netlify bundles.
+- [Phase 03-cleanup-compatibility-and-hardening]: Widen only the MySQL share_rate_limits.share_id column to VARCHAR(255); share audit event share_id remains a share row ID at VARCHAR(36).
+- [Phase 03-cleanup-compatibility-and-hardening]: Strip non-finite owner create timing values to undefined at the route boundary rather than changing the public request contract or service API.
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-03T10:58:28.394Z
-Stopped at: Completed 03-cleanup-compatibility-and-hardening-07-PLAN.md
+Last session: 2026-05-03T12:51:05.013Z
+Stopped at: Completed 03-cleanup-compatibility-and-hardening-08-PLAN.md
 Resume file: None
