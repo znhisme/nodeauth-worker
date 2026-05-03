@@ -88,6 +88,25 @@ export interface CreateShareInput {
     includeOtp?: boolean;
 }
 
+export interface CreateSharesBatchInput extends Omit<CreateShareInput, 'vaultItemId'> {
+    vaultItemIds: string[];
+}
+
+export interface OwnerShareBatchSuccessView {
+    requestIndex: number;
+    share: OwnerShareCreatedView;
+}
+
+export interface OwnerShareBatchFailureView {
+    requestIndex: number;
+    error: 'could_not_create_share';
+}
+
+export interface OwnerShareBatchCreatedView {
+    successes: OwnerShareBatchSuccessView[];
+    failures: OwnerShareBatchFailureView[];
+}
+
 export interface CreateShareResult {
     share: ShareLinkRecord;
     rawToken: string;

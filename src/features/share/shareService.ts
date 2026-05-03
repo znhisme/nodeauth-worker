@@ -15,7 +15,9 @@ import {
 } from '@/features/share/shareSecurity';
 import {
     type CreateShareInput,
+    type CreateSharesBatchInput,
     type OwnerShareCreatedView,
+    type OwnerShareBatchCreatedView,
     type OwnerShareMetadataView,
     type CreateShareResult,
     type ResolveShareAccessInput,
@@ -171,6 +173,30 @@ export class ShareService {
             rawToken: created.rawToken,
             rawAccessCode: created.rawAccessCode,
         };
+    }
+
+    async createSharesForOwnerBatch(input: CreateSharesBatchInput): Promise<OwnerShareBatchCreatedView> {
+        const batchNow = input.now ?? Date.now();
+        const successes: OwnerShareBatchCreatedView['successes'] = [];
+        const failures: OwnerShareBatchCreatedView['failures'] = [];
+
+        for (const [requestIndex, vaultItemId] of input.vaultItemIds.entries()) {
+            try {
+                const share = await this.createShareForOwner({
+                    ownerId: input.ownerId,
+                    vaultItemId,
+                    ttlSeconds: input.ttlSeconds,
+                    expiresAt: input.expiresAt,
+                    now: batchNow,
+                    publicOrigin: input.publicOrigin,
+                });
+                successes.push({ requestIndex, share });
+            } catch {
+                failures.push({ requestIndex, error: 'could_not_create_share' });
+            }
+        }
+
+        return { successes, failures };
     }
 
     async listSharesForOwner(ownerId: string, now = Date.now()): Promise<OwnerShareMetadataView[]> {
