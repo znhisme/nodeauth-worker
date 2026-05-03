@@ -381,7 +381,7 @@ const MIGRATIONS: Migration[] = [
             );
             CREATE TABLE IF NOT EXISTS share_rate_limits (
                 \`key\` VARCHAR(255) PRIMARY KEY,
-                share_id VARCHAR(36) NOT NULL,
+                share_id VARCHAR(255) NOT NULL,
                 attempts BIGINT DEFAULT 0,
                 window_started_at BIGINT NOT NULL,
                 last_attempt_at BIGINT NOT NULL,

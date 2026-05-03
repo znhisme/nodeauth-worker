@@ -46,7 +46,7 @@ export const shareAuditEvents = mysqlTable('share_audit_events', {
 
 export const shareRateLimits = mysqlTable('share_rate_limits', {
     key: varchar('key', { length: 255 }).primaryKey(),
-    shareId: varchar('share_id', { length: 36 }).notNull(),
+    shareId: varchar('share_id', { length: 255 }).notNull(),
     attempts: bigint('attempts', { mode: 'number' }).notNull().default(0),
     windowStartedAt: bigint('window_started_at', { mode: 'number' }).notNull(),
     lastAttemptAt: bigint('last_attempt_at', { mode: 'number' }).notNull(),

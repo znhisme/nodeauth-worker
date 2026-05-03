@@ -44,6 +44,7 @@ const requiredMysqlShareMigrationStrings = [
     'token_hash VARCHAR(255) NOT NULL',
     'access_code_hash VARCHAR(255) NOT NULL',
     'key VARCHAR(255) PRIMARY KEY',
+    'share_id VARCHAR(255) NOT NULL',
 ];
 
 const forbiddenMysqlShareMigrationPatterns = [
