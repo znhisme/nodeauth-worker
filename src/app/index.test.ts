@@ -67,3 +67,47 @@ describe('API CORS source contract', () => {
         expect(source).toContain('credentials: true');
     });
 });
+
+describe('share cleanup runtime source contract', () => {
+    it('keeps Worker scheduled backup and adds share cleanup to waitUntil', () => {
+        const source = readFileSync(new URL('./worker.ts', import.meta.url), 'utf8');
+
+        expect(source).toContain("import { createShareService } from '@/features/share/shareService';");
+        expect(source).toContain('async scheduled');
+        expect(source).toContain('ctx.waitUntil(Promise.all([');
+        expect(source).toContain('handleScheduledBackup(specializedEnv)');
+        expect(source).toContain('createShareService(specializedEnv as any).cleanupShareState()');
+    });
+
+    it('keeps Docker daily backup cron and logs share cleanup counts only', () => {
+        const source = readFileSync(new URL('./server.ts', import.meta.url), 'utf8');
+
+        expect(source).toContain("import { createShareService } from '@/features/share/shareService';");
+        expect(source).toContain("cron.schedule('0 2 * * *'");
+        expect(source).toContain('handleScheduledBackup(envTemplate as any)');
+        expect(source).toContain('[Cron] Triggering share cleanup...');
+        expect(source).toContain('createShareService(envTemplate as any).cleanupShareState()');
+        expect(source).toContain('expiredSharesMarked: result.expiredSharesMarked');
+        expect(source).toContain('staleRateLimitRowsDeleted: result.staleRateLimitRowsDeleted');
+        expect(source).toContain('[Cron] Share cleanup failed:');
+        expect(source).not.toContain('rawToken');
+        expect(source).not.toContain('rawAccessCode');
+        expect(source).not.toContain('accessCodeHash');
+    });
+
+    it('adds Netlify opportunistic cleanup after cached DB initialization without blocking app fetch', () => {
+        const source = readFileSync(new URL('./netlify.ts', import.meta.url), 'utf8');
+
+        expect(source).toContain("import { createShareService } from '@/features/share/shareService'");
+        expect(source).toContain('const SHARE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;');
+        expect(source).toContain('let lastShareCleanupAt = 0;');
+        expect(source).toContain('if (cachedDb?.db && now - lastShareCleanupAt >= SHARE_CLEANUP_INTERVAL_MS)');
+        expect(source).toContain('lastShareCleanupAt = now;');
+        expect(source).toContain('DB: cachedDb.db');
+        expect(source).toContain('cleanupShareState(now)');
+        expect(source).toContain("[Share Cleanup] Completed");
+        expect(source).toContain("[Share Cleanup] Failed:");
+        expect(source.indexOf('cleanupShareState(now)')).toBeLessThan(source.indexOf('const res = await app.fetch'));
+        expect(source).toContain('const res = await app.fetch');
+    });
+});

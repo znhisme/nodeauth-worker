@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import app from '@/app/index';
 import * as schema from '@/shared/db/schema/sqlite';
 import { handleScheduledBackup } from '@/features/backup/backupRoutes';
+import { createShareService } from '@/features/share/shareService';
 import { migrateDatabase } from '@/shared/db/migrator';
 import { D1Executor } from '@/shared/db/d1Executor';
 
@@ -33,6 +34,9 @@ export default {
             ...env,
             DB: db
         };
-        ctx.waitUntil(handleScheduledBackup(specializedEnv));
+        ctx.waitUntil(Promise.all([
+            handleScheduledBackup(specializedEnv),
+            createShareService(specializedEnv as any).cleanupShareState(),
+        ]));
     }
 };

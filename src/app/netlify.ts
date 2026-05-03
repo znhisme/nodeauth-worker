@@ -1,6 +1,7 @@
 import app from '@/app/index'
 import { DbFactory } from '@/shared/db/factory'
 import { migrateDatabase } from '@/shared/db/migrator'
+import { createShareService } from '@/features/share/shareService'
 
 /**
  * NodeAuth 生产级 Netlify 适配器 (Architect V8 - 多 Cookie 修复版)
@@ -11,6 +12,8 @@ import { migrateDatabase } from '@/shared/db/migrator'
  */
 
 let cachedDb: any = null;
+const SHARE_CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
+let lastShareCleanupAt = 0;
 
 export const handler = async (event: any, context: any) => {
     try {
@@ -36,6 +39,24 @@ export const handler = async (event: any, context: any) => {
                     statusCode: 503,
                     body: JSON.stringify({ success: false, error: 'Database Initialization Failed', detail: err.message })
                 };
+            }
+        }
+
+        const now = Date.now();
+        if (cachedDb?.db && now - lastShareCleanupAt >= SHARE_CLEANUP_INTERVAL_MS) {
+            lastShareCleanupAt = now;
+            try {
+                const result = await createShareService({
+                    ...process.env,
+                    ...context,
+                    DB: cachedDb.db,
+                } as any).cleanupShareState(now);
+                console.log('[Share Cleanup] Completed', {
+                    expiredSharesMarked: result.expiredSharesMarked,
+                    staleRateLimitRowsDeleted: result.staleRateLimitRowsDeleted,
+                });
+            } catch (err: any) {
+                console.error('[Share Cleanup] Failed:', err.message || err);
             }
         }
 

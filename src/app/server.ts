@@ -3,6 +3,7 @@ import cron from 'node-cron';
 import { initializeEnv } from '@/shared/utils/crypto';
 import app from '@/app/index';
 import { handleScheduledBackup } from '@/features/backup/backupRoutes';
+import { createShareService } from '@/features/share/shareService';
 import fs from 'fs';
 import path from 'path';
 import { migrateDatabase } from '@/shared/db/migrator';
@@ -108,6 +109,17 @@ cron.schedule('0 2 * * *', async () => {
         await handleScheduledBackup(envTemplate as any);
     } catch (e) {
         logger.error('[Cron] Backup failed:', e);
+    }
+
+    try {
+        logger.info('[Cron] Triggering share cleanup...');
+        const result = await createShareService(envTemplate as any).cleanupShareState();
+        logger.info('[Cron] Share cleanup completed:', {
+            expiredSharesMarked: result.expiredSharesMarked,
+            staleRateLimitRowsDeleted: result.staleRateLimitRowsDeleted,
+        });
+    } catch (e) {
+        logger.error('[Cron] Share cleanup failed:', e);
     }
 });
 
