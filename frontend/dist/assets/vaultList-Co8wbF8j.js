@@ -1,7 +1,7 @@
 const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/index-B1iRy_WF.js","assets/pdf-utils-r4RjNe6V.js","assets/compression-utils-CXh1ITwj.js","assets/vue-core-Daban9YF.js","assets/element-plus-Dh0klhaa.js","assets/element-plus-Dh61In7b.css","assets/simplewebauthn-3qpiAaRi.js","assets/tanstack-query-C-OQsQoR.js","assets/index-CLSE-HWx.css"])))=>i.map(i=>d[i]);
 import { d as Xt, H as In, e as En, V as An, f as mn, M as vn, ac as Dn, aM as On, at as Vn, aN as Ln, aO as Fn, aP as Gt, aQ as wt, X as Zt, Y as lt, Q as Bn, l as zt, S as Hn, E as De, o as Jt, i as Pn, h as Wn, a1 as Un, y as Xn, ak as Yn, aR as Nn, aS as qn, u as Kn, aT as Qn, Z as jn, R as Gn, F as Zn, G as Jn, aU as el, aV as tl, aW as nl, ad as ll, aX as il } from "./element-plus-Dh0klhaa.js";
 import { D as mt, I as k, J as he, P as _, H as Pe, X as Mt, e as P, ab as ol, aj as sl, ak as al, U as Ct, u as n, x as en, k as Je, f as we, ae as b, v as xt, m as rl, n as dt, K as pn, L as cl, a3 as ft, W as Rt, M as Z, Y as ve, F as Ge, ac as $t, ar as ul, S as Ze, R as ot, O as h, c as te, as as dl, s as bt, a8 as fl, aw as ml, A as ct, az as vl, $ as gn, _ as X, Q as E, Z as $e, aa as je, a0 as pl, l as Ot, T as gl } from "./vue-core-Daban9YF.js";
-import { _ as hn, u as Tt, C as Yt, E as hl, G as tn, b as yl, H as _l, a as yn, i as wl, l as St, D as _n, f as wn, __tla as __tla_0 } from "./index-B1iRy_WF.js";
+import { _ as hn, u as Tt, C as Yt, E as hl, G as tn, b as yl, H as _l, a as yn, i as wl, l as St, D as _n, f as wn, r as qo, __tla as __tla_0 } from "./index-B1iRy_WF.js";
 import { g as Vt, u as bn, v as nt, t as ut, b as nn, __tla as __tla_1 } from "./vaultService-Bnsr_AJx.js";
 import { _ as ln } from "./responsiveOverlay-AHUKd6Ll.js";
 import { u as bl } from "./useVaultList-MTZ7e-QK.js";
@@ -2421,6 +2421,21 @@ let __tla = Promise.all([
                                                                                 ]),
                                                                             _: 1
                                                                         })) : ve("", !0),
+                                                                        e.item.deletedAt == null ? (k(), he(re, {
+                                                                            key: 3,
+                                                                            command: "share"
+                                                                        }, {
+                                                                            default: _(()=>[
+                                                                                    h(m, null, {
+                                                                                        default: _(()=>[
+                                                                                                h(n(Gt))
+                                                                                            ]),
+                                                                                        _: 1
+                                                                                    }),
+                                                                                    $e(" 分享链接")
+                                                                                ]),
+                                                                            _: 1
+                                                                        })) : ve("", !0),
                                                                         h(re, {
                                                                             command: "delete",
                                                                             class: "text-danger"
@@ -2832,8 +2847,28 @@ let __tla = Promise.all([
                 G,
                 ""
             ];
+        }, de = async (f)=>{
+            try {
+                if (!f?.id) return;
+                if (!navigator.onLine || d.isOffline) {
+                    De.warning(g("security.offline_network_blocked"));
+                    return;
+                }
+                const y = await qo("/api/share", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        vaultItemId: f.id
+                    })
+                }), G = y?.share || y?.data?.share || y?.data || y;
+                if (!G?.url && !G?.shareUrl && !G?.publicUrl) throw new Error("share_url_missing");
+                const ye = G.url || G.shareUrl || G.publicUrl, p = G.rawAccessCode || G.accessCode || y?.rawAccessCode || y?.accessCode, C = `分享链接：${ye}
+访问码：${p || "请在分享详情中查看"}`;
+                await Lt(C, p ? "分享链接和访问码已复制" : "分享链接已复制"), De.success(p ? "分享链接和访问码已复制，请只发送给可信联系人" : "分享链接已复制，请在分享详情中查看访问码");
+            } catch (y) {
+                St.error(y), De.error("创建分享链接失败");
+            }
         }, Ce = (f, y)=>{
-            f === "edit" ? H(y) : f === "qr" ? m(y) : f === "delete" ? ie(y) : f === "restore" && fe(y);
+            f === "edit" ? H(y) : f === "qr" ? m(y) : f === "delete" ? ie(y) : f === "restore" ? fe(y) : f === "share" && de(y);
         }, fe = async (f)=>{
             if (!navigator.onLine || d.isOffline) {
                 De.warning(g("security.offline_network_restore_blocked"));
@@ -2876,6 +2911,7 @@ let __tla = Promise.all([
             formatCode: re,
             getCodeGroups: se,
             handleCommand: Ce,
+            openShareLink: de,
             performReorder: ue,
             handleResolveConflict: be,
             restoreVault: fe,
