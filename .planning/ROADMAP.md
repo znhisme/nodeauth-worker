@@ -69,7 +69,14 @@ Plans:
   3. Share-link schema, repository, and route behavior pass against the supported database/runtime paths available in this checkout.
   4. Tests cover expired, revoked, wrong-code, locked/rate-limited, deleted-item, wrong-owner, token-enumeration, response allowlist, secure header, generic error, and log redaction scenarios.
   5. Existing auth, vault, backup, health, and deployment behavior continues to work after share-link API support is added.
-**Plans**: TBD
+**Plans**: 6 plans
+Plans:
+- [ ] 03-01-PLAN.md — Add source-level expired-share and stale-limiter cleanup primitives.
+- [ ] 03-02-PLAN.md — Wire cleanup into Worker, Docker, and Netlify runtime paths.
+- [ ] 03-03-PLAN.md — Document and expose truthful revocation limitation semantics.
+- [ ] 03-04-PLAN.md — Fix MySQL share migration compatibility and run blocking schema/build validation.
+- [ ] 03-05-PLAN.md — Expand public share security and privacy hardening tests.
+- [ ] 03-06-PLAN.md — Run final regression gates and regenerate backend runtime bundles.
 **UI hint**: yes
 
 ## Progress
@@ -81,7 +88,7 @@ Phases execute in numeric order: 1 -> 2 -> 3
 |-------|----------------|--------|-----------|
 | 1. Foundation and Security Primitives | 7/7 | Complete | 2026-05-02 |
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
-| 3. Cleanup, Compatibility, and Hardening | 0/TBD | Not started | - |
+| 3. Cleanup, Compatibility, and Hardening | 0/6 | Not started | - |
 
 ## Requirement Coverage
 
