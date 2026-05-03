@@ -73842,7 +73842,7 @@ auth.get("/sessions", authMiddleware, async (c) => {
   const service = getSessionService(c);
   const clientIp = c.req.header("CF-Connecting-IP") || "unknown";
   if (currentSessionId) {
-    c.executionCtx.waitUntil(service.heartbeat(currentSessionId, clientIp));
+    c.executionCtx?.waitUntil?.(service.heartbeat(currentSessionId, clientIp));
   }
   const sessions = await service.getUserSessions(user.email || user.id, currentSessionId);
   return c.json({ success: true, sessions });
@@ -88987,7 +88987,8 @@ var PgExecutor = class {
       database: config.database || "nodeauth",
       max: 10,
       idleTimeoutMillis: 3e4,
-      connectionTimeoutMillis: 2e3,
+      connectionTimeoutMillis: 1e4,
+      // 延长至 10 秒，增加 Serverless 环境下的连接容错性
       ssl: config.ssl ? { rejectUnauthorized: false } : void 0
     });
   }
@@ -89373,7 +89374,10 @@ var cachedDb = null;
 var handler = async (event, context) => {
   try {
     if (!cachedDb) {
-      console.log("\u{1F4E1} [DB] Initializing connection for:", event.httpMethod ? "HTTP" : "CRON");
+      const userAgent = (event.headers["user-agent"] || event.headers["User-Agent"] || "").toLowerCase();
+      const isCronEvent = event.headers["x-nf-event"] === "schedule";
+      const isCronMode = !event.httpMethod || isCronEvent || userAgent.includes("netlify-cron");
+      console.log("\u{1F4E1} [DB] Initializing connection for:", isCronMode ? "CRON" : `HTTP (${event.httpMethod})`);
       const { db, executor } = await DbFactory.create();
       cachedDb = { db, executor };
       if (db && typeof db.on === "function") {
@@ -89394,14 +89398,24 @@ var handler = async (event, context) => {
       }
     }
     if (true) {
-      if (event.httpMethod) {
-        console.warn("\u26A0\uFE0F [Cron] Blocked external HTTP attempt to trigger cron.");
+      const userAgent = (event.headers["user-agent"] || event.headers["User-Agent"] || "").toLowerCase();
+      let hasNextRun = false;
+      try {
+        if (event.body) {
+          const body2 = JSON.parse(event.isBase64Encoded ? Buffer.from(event.body, "base64").toString() : event.body);
+          hasNextRun = !!body2.next_run;
+        }
+      } catch (e2) {
+      }
+      const isSystemTrigger = event.headers["x-nf-event"] === "schedule" || userAgent.includes("netlify-cron") || hasNextRun;
+      if (event.httpMethod && !isSystemTrigger) {
+        console.warn(`\u26A0\uFE0F [Cron] Blocked unauthorized HTTP attempt. UA: ${userAgent}`);
         return {
           statusCode: 403,
-          body: JSON.stringify({ success: false, error: "Forbidden: This function is for internal scheduling only" })
+          body: JSON.stringify({ success: false, error: "Forbidden: External trigger not allowed" })
         };
       }
-      console.log("\u23F0 [Cron] Internal scheduled trigger executed.");
+      console.log("\u23F0 [Cron] System scheduled trigger verified.");
       await handleScheduledBackup({ ...process.env, DB: cachedDb.db });
       return {
         statusCode: 200,
@@ -89431,6 +89445,12 @@ var handler = async (event, context) => {
       ...process.env,
       ...context,
       DB: cachedDb?.db
+    }, {
+      waitUntil: (promise) => {
+        promise.catch((err) => console.error("\u26A0\uFE0F [Netlify Background] Task Error:", err));
+      },
+      passThroughOnException: () => {
+      }
     });
     const headers = {};
     const multiValueHeaders = {};
