@@ -46575,7 +46575,7 @@ auth.get("/sessions", authMiddleware, async (c2) => {
   const service = getSessionService(c2);
   const clientIp = c2.req.header("CF-Connecting-IP") || "unknown";
   if (currentSessionId) {
-    c2.executionCtx.waitUntil(service.heartbeat(currentSessionId, clientIp));
+    c2.executionCtx?.waitUntil?.(service.heartbeat(currentSessionId, clientIp));
   }
   const sessions = await service.getUserSessions(user.email || user.id, currentSessionId);
   return c2.json({ success: true, sessions });

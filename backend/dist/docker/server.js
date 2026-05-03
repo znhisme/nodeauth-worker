@@ -64325,7 +64325,7 @@ auth.get("/sessions", authMiddleware, async (c) => {
   const service = getSessionService(c);
   const clientIp = c.req.header("CF-Connecting-IP") || "unknown";
   if (currentSessionId) {
-    c.executionCtx.waitUntil(service.heartbeat(currentSessionId, clientIp));
+    c.executionCtx?.waitUntil?.(service.heartbeat(currentSessionId, clientIp));
   }
   const sessions = await service.getUserSessions(user.email || user.id, currentSessionId);
   return c.json({ success: true, sessions });
@@ -79773,7 +79773,8 @@ var PgExecutor = class {
       database: config.database || "nodeauth",
       max: 10,
       idleTimeoutMillis: 3e4,
-      connectionTimeoutMillis: 2e3,
+      connectionTimeoutMillis: 1e4,
+      // 延长至 10 秒，增加 Serverless 环境下的连接容错性
       ssl: config.ssl ? { rejectUnauthorized: false } : void 0
     });
   }

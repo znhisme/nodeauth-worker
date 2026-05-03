@@ -73843,7 +73843,7 @@ auth.get("/sessions", authMiddleware, async (c) => {
   const service = getSessionService(c);
   const clientIp = c.req.header("CF-Connecting-IP") || "unknown";
   if (currentSessionId) {
-    c.executionCtx.waitUntil(service.heartbeat(currentSessionId, clientIp));
+    c.executionCtx?.waitUntil?.(service.heartbeat(currentSessionId, clientIp));
   }
   const sessions = await service.getUserSessions(user.email || user.id, currentSessionId);
   return c.json({ success: true, sessions });
@@ -88988,7 +88988,8 @@ var PgExecutor = class {
       database: config.database || "nodeauth",
       max: 10,
       idleTimeoutMillis: 3e4,
-      connectionTimeoutMillis: 2e3,
+      connectionTimeoutMillis: 1e4,
+      // 延长至 10 秒，增加 Serverless 环境下的连接容错性
       ssl: config.ssl ? { rejectUnauthorized: false } : void 0
     });
   }
@@ -89396,6 +89397,7 @@ var vercel_default = async (req, res) => {
     };
     const protocol = req.headers["x-forwarded-proto"] || "https";
     const host = req.headers.host || "localhost";
+    console.log(`\u{1F310} [Vercel Entry] ${req.method} ${req.url} (Host: ${host})`);
     let urlObj;
     try {
       urlObj = new URL(req.url, `${protocol}://${host}`);
@@ -89405,19 +89407,20 @@ var vercel_default = async (req, res) => {
     if (!urlObj.pathname.startsWith("/api")) {
       urlObj.pathname = "/api" + (urlObj.pathname === "/" ? "" : urlObj.pathname);
     }
-    if (urlObj.pathname.startsWith("/api/cron")) {
+    if (urlObj.pathname.includes("/api/cron")) {
       const isVercelCron = req.headers["x-vercel-cron"] === "1";
       const authHeader = req.headers["authorization"];
       const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
-      if (!isVercelCron || process.env.CRON_SECRET && authHeader !== expectedAuth) {
+      const isSecretValid = process.env.CRON_SECRET && authHeader === expectedAuth;
+      if (!isVercelCron && !isSecretValid) {
         console.warn("\u26A0\uFE0F [Vercel Cron] Unauthorized access attempt blocked:", urlObj.pathname);
         res.statusCode = 401;
         res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify({ success: false, error: "Unauthorized: Missing or invalid CRON_SECRET" }));
+        res.end(JSON.stringify({ success: false, error: "Unauthorized" }));
         return;
       }
       console.log("\u23F0 [Vercel Cron] Authorized scheduled trigger:", urlObj.pathname);
-      if (urlObj.pathname === "/api/cron/backup") {
+      if (urlObj.pathname.includes("/backup")) {
         await handleScheduledBackup(bindings);
       }
       res.statusCode = 200;
@@ -89433,7 +89436,13 @@ var vercel_default = async (req, res) => {
       init.body = req;
       init.duplex = "half";
     }
-    const response = await index_default.fetch(new Request(urlObj.toString(), init), bindings);
+    const response = await index_default.fetch(new Request(urlObj.toString(), init), bindings, {
+      waitUntil: (promise) => {
+        promise.catch((err) => console.error("\u26A0\uFE0F [Vercel Background] Task Error:", err));
+      },
+      passThroughOnException: () => {
+      }
+    });
     res.statusCode = response.status;
     if (typeof response.headers.getSetCookie === "function") {
       const setCookies = response.headers.getSetCookie();

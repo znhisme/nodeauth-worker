@@ -1,6 +1,5 @@
 services:
   nodeauth-worker:
-    build: .
     image: nodeauth-worker:latest
     container_name: nodeauth
     restart: unless-stopped
