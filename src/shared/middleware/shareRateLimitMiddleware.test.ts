@@ -44,7 +44,9 @@ const makeContext = (overrides: any = {}) => {
 
 const expectShareInaccessibleResponse = async (response: Response) => {
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({
+    const body = await response.json();
+    expect(Object.keys(body).sort()).toEqual(['data', 'message', 'success']);
+    expect(body).toEqual({
         success: false,
         message: 'share_inaccessible',
         data: null,
@@ -70,7 +72,7 @@ describe('shareRateLimit', () => {
         await expectShareInaccessibleResponse(response);
     });
 
-    it('returns generic share_inaccessible response when repository errors', async () => {
+    it('returns generic share_inaccessible response for fail-closed DB-error path', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext();
         const next = vi.fn();
@@ -83,7 +85,7 @@ describe('shareRateLimit', () => {
         expect(next).not.toHaveBeenCalled();
     });
 
-    it('returns generic share_inaccessible response when decision is denied', async () => {
+    it('returns generic share_inaccessible response when locked/rate-limited decision is denied', async () => {
         const middleware = shareRateLimit();
         const ctx = makeContext({
             env: {

@@ -98,6 +98,22 @@ const expectPublicHeaders = (response: Response) => {
     expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
 };
 
+const ownerMetadataKeys = ['accessCount', 'createdAt', 'expiresAt', 'id', 'item', 'lastAccessedAt', 'revokedAt', 'status'];
+const ownerItemKeys = ['account', 'id', 'service'];
+
+const expectOwnerMetadataAllowlist = (share: any, includeCreateSecrets = false) => {
+    const expectedKeys = includeCreateSecrets
+        ? [...ownerMetadataKeys, 'rawAccessCode', 'rawToken'].sort()
+        : ownerMetadataKeys;
+    expect(Object.keys(share).sort()).toEqual(expectedKeys);
+    expect(Object.keys(share.item).sort()).toEqual(ownerItemKeys);
+};
+
+const expectPublicFailureAllowlist = (body: any) => {
+    expect(Object.keys(body).sort()).toEqual(['data', 'message', 'success']);
+    expect(body).toEqual({ success: false, message: 'share_inaccessible', data: null });
+};
+
 describe('Share link routes', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -135,6 +151,8 @@ describe('Share link routes', () => {
                 rawAccessCode: 'code-123',
             },
         });
+        expect(Object.keys(body).sort()).toEqual(['share', 'success']);
+        expectOwnerMetadataAllowlist(body.share, true);
         expect(mocks.createShareForOwner).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
             vaultItemId: 'vault-1',
@@ -170,6 +188,8 @@ describe('Share link routes', () => {
 
         expect(response.status).toBe(200);
         expect(body).toEqual({ success: true, shares: [makeMetadataShare()] });
+        expect(Object.keys(body).sort()).toEqual(['shares', 'success']);
+        expectOwnerMetadataAllowlist(body.shares[0]);
         expect(mocks.listSharesForOwner).toHaveBeenCalledWith('owner@example.com');
         expectOwnerResponseIsSafe(body);
     });
@@ -183,6 +203,8 @@ describe('Share link routes', () => {
 
         expect(response.status).toBe(200);
         expect(body).toEqual({ success: true, share: makeMetadataShare() });
+        expect(Object.keys(body).sort()).toEqual(['share', 'success']);
+        expectOwnerMetadataAllowlist(body.share);
         expect(mocks.getShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1');
         expectOwnerResponseIsSafe(body);
     });
@@ -202,6 +224,8 @@ describe('Share link routes', () => {
             share: makeMetadataShare({ status: 'revoked', revokedAt: '2000' }),
             message: 'Share link revoked. Future access is blocked, but NodeAuth cannot retract credentials already viewed or copied.',
         });
+        expect(Object.keys(body).sort()).toEqual(['message', 'share', 'success']);
+        expectOwnerMetadataAllowlist(body.share);
         expect(mocks.revokeShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1');
         expectOwnerResponseIsSafe(body);
     });
@@ -263,6 +287,15 @@ describe('Share link routes', () => {
                 },
             },
         });
+        expect(Object.keys(body).sort()).toEqual(['data', 'success']);
+        expect(Object.keys(body.data).sort()).toEqual(['account', 'otp', 'service']);
+        expect(Object.keys(body.data.otp).sort()).toEqual(['code', 'period', 'remainingSeconds']);
+        expect(JSON.stringify(body)).not.toContain('ownerId');
+        expect(JSON.stringify(body)).not.toContain('vaultItemId');
+        expect(JSON.stringify(body)).not.toContain('tokenHash');
+        expect(JSON.stringify(body)).not.toContain('accessCodeHash');
+        expect(JSON.stringify(body)).not.toContain('raw-token-123');
+        expect(JSON.stringify(body)).not.toContain('rawAccessCode');
         expect(mocks.authMiddleware).not.toHaveBeenCalled();
         expect(mocks.shareRateLimitMiddleware).toHaveBeenCalledTimes(1);
         expect(mocks.resolveShareAccess).toHaveBeenCalledWith({
@@ -299,7 +332,7 @@ describe('Share link routes', () => {
         const body = await response.json();
 
         expect(response.status).toBe(404);
-        expect(body).toEqual({ success: false, message: 'share_inaccessible', data: null });
+        expectPublicFailureAllowlist(body);
         const serialized = JSON.stringify(body);
         for (const forbidden of [
             'revoked',
@@ -313,6 +346,37 @@ describe('Share link routes', () => {
         ]) {
             expect(serialized).not.toContain(forbidden);
         }
+        expectPublicHeaders(response);
+    });
+
+    it.each([
+        ['expired share', { accessible: false, status: 'expired', reason: 'inaccessible', share: null, itemView: null }],
+        ['revoked share', { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null }],
+        ['wrong code', { accessible: false, status: 'active', reason: 'inaccessible', share: null, itemView: null }],
+        ['deleted item', { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null }],
+        ['missing token', { accessible: false, status: 'revoked', reason: 'inaccessible', share: null, itemView: null }],
+    ])('POST /api/share/public/:token/access returns the same generic body for %s', async (_label, decision) => {
+        mocks.resolveShareAccess.mockResolvedValue({
+            ...decision,
+            publicHeaders: {
+                'Cache-Control': 'no-store',
+                Pragma: 'no-cache',
+                'Referrer-Policy': 'no-referrer',
+            },
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/public/raw-token-123/access', {
+            method: 'POST',
+            body: JSON.stringify({ accessCode: 'code-123' }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+        const body = await response.json();
+
+        expect(response.status).toBe(404);
+        expectPublicFailureAllowlist(body);
         expectPublicHeaders(response);
     });
 });

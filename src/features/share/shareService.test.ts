@@ -50,6 +50,46 @@ const expectRecipientSafeDecision = (decision: any) => {
     });
 };
 
+const forbiddenRecipientValues = [
+    'ownerId',
+    'vaultItemId',
+    'tokenHash',
+    'accessCodeHash',
+    'raw-public-token-123',
+    'correct-code',
+    'wrong-code',
+    'password',
+    'seed',
+    'otpauth',
+    'backup',
+    'session',
+    'http://',
+    'https://',
+];
+
+const expectPublicInaccessibleDecision = (decision: any, rawToken = 'raw-public-token-123', accessCode = 'correct-code') => {
+    expect(decision).toMatchObject({
+        accessible: false,
+        reason: 'inaccessible',
+        share: null,
+        itemView: null,
+    });
+    expect(decision.publicHeaders).toEqual({
+        'Cache-Control': 'no-store',
+        Pragma: 'no-cache',
+        'Referrer-Policy': 'no-referrer',
+    });
+
+    const serialized = JSON.stringify(decision);
+    for (const forbidden of [
+        ...forbiddenRecipientValues,
+        rawToken,
+        accessCode,
+    ]) {
+        expect(serialized).not.toContain(forbidden);
+    }
+};
+
 const expectSafeAuditEvent = (auditEvent: any, forbiddenValues: string[]) => {
     const serialized = JSON.stringify(auditEvent);
     for (const value of forbiddenValues) {
@@ -294,6 +334,21 @@ describe('ShareService', () => {
         expectRecipientSafeDecision(decision);
     });
 
+    it('missing token hash / token enumeration resolves inaccessible without share data', async () => {
+        const rawToken = 'raw-public-token-123';
+        shareRepository.findByTokenHash.mockResolvedValue(null);
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken);
+        expect(vaultRepository.findActiveByIdForOwner).not.toHaveBeenCalled();
+        expect(shareRepository.markAccessed).not.toHaveBeenCalled();
+    });
+
     it('serializes expired decisions with public headers and no internal share fields', async () => {
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ expiresAt: 900 }));
 
@@ -307,6 +362,21 @@ describe('ShareService', () => {
         expectRecipientSafeDecision(decision);
     });
 
+    it('expired share resolves inaccessible before vault lookup', async () => {
+        const rawToken = 'raw-public-token-123';
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ expiresAt: 900 }));
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken);
+        expect(decision.status).toBe('expired');
+        expect(vaultRepository.findActiveByIdForOwner).not.toHaveBeenCalled();
+    });
+
     it('serializes revoked decisions with public headers and no internal share fields', async () => {
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ revokedAt: 1000 }));
 
@@ -318,6 +388,24 @@ describe('ShareService', () => {
 
         expect(decision).toMatchObject({ accessible: false, status: 'revoked', reason: 'inaccessible' });
         expectRecipientSafeDecision(decision);
+    });
+
+    it('revoked share resolves inaccessible without secret processing', async () => {
+        const rawToken = 'raw-public-token-123';
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        const generateSpy = vi.spyOn(otpModule, 'generate');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({ revokedAt: 1000 }));
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken);
+        expect(decision.status).toBe('revoked');
+        expect(decryptSpy).not.toHaveBeenCalled();
+        expect(generateSpy).not.toHaveBeenCalled();
     });
 
     it('serializes deleted-item decisions with public headers and no internal share fields', async () => {
@@ -334,6 +422,23 @@ describe('ShareService', () => {
         expectRecipientSafeDecision(decision);
     });
 
+    it('deleted item resolves inaccessible without decrypting', async () => {
+        const rawToken = 'raw-public-token-123';
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(null);
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'correct-code',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken);
+        expect(vaultRepository.findActiveByIdForOwner).toHaveBeenCalledWith('vault-1', 'owner-1');
+        expect(decryptSpy).not.toHaveBeenCalled();
+    });
+
     it('serializes wrong-code decisions with public headers and no internal share fields', async () => {
         shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
@@ -346,6 +451,45 @@ describe('ShareService', () => {
 
         expect(decision).toMatchObject({ accessible: false, status: 'active', reason: 'inaccessible' });
         expectRecipientSafeDecision(decision);
+    });
+
+    it('wrong code resolves inaccessible without decrypting or generating OTP', async () => {
+        const rawToken = 'raw-public-token-123';
+        const decryptSpy = vi.spyOn(dbModule, 'decryptField');
+        const generateSpy = vi.spyOn(otpModule, 'generate');
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord());
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+
+        const decision = await service.resolveShareAccess({
+            token: rawToken,
+            accessCode: 'wrong-code',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision, rawToken, 'wrong-code');
+        expect(decision.status).toBe('active');
+        expect(decryptSpy).not.toHaveBeenCalled();
+        expect(generateSpy).not.toHaveBeenCalled();
+    });
+
+    it('wrong owner uses the share owner for vault lookup instead of request-owner data', async () => {
+        shareRepository.findByTokenHash.mockResolvedValue(makeShareRecord({
+            ownerId: 'real-owner@example.com',
+            vaultItemId: 'vault-owned-by-real-owner',
+        }));
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(null);
+
+        const decision = await service.resolveShareAccess({
+            token: 'raw-public-token-123',
+            accessCode: 'correct-code',
+            ownerId: 'attacker@example.com',
+            now: 1000,
+        } as any);
+
+        expectPublicInaccessibleDecision(decision);
+        expect(vaultRepository.findActiveByIdForOwner)
+            .toHaveBeenCalledWith('vault-owned-by-real-owner', 'real-owner@example.com');
+        expect(JSON.stringify(vaultRepository.findActiveByIdForOwner.mock.calls)).not.toContain('attacker@example.com');
     });
 
     it('serializes successful decisions with public headers and no internal share fields', async () => {

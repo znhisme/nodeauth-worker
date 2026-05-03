@@ -11,8 +11,17 @@ describe('redactSharePublicToken', () => {
         expect(redacted).not.toContain('raw-public-token-123');
     });
 
+    it('redacts public share access tokens while preserving query strings', () => {
+        const redacted = redactSharePublicToken('POST /api/share/public/raw-public-token-123/access?x=1 404');
+
+        expect(redacted).toContain('/api/share/public/[share-token]/access?x=1');
+        expect(redacted).not.toContain('raw-public-token-123');
+    });
+
     it('preserves ordinary API paths', () => {
         expect(redactSharePublicToken('GET /api/vault?page=1 200')).toBe('GET /api/vault?page=1 200');
+        expect(redactSharePublicToken('GET /api/vault/raw-public-token-123/access 200'))
+            .toBe('GET /api/vault/raw-public-token-123/access 200');
     });
 });
 
