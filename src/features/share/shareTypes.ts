@@ -1,7 +1,7 @@
 export const SHARE_TOKEN_BYTES = 32;
 export const SHARE_ACCESS_CODE_BYTES = 16;
-export const SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-export const SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+export const SHARE_DEFAULT_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const SHARE_MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 export const SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 export const SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
 export const SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1000;

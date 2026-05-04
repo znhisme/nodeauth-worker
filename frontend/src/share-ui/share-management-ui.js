@@ -10,6 +10,7 @@
         batchBusy: false,
         observerStarted: false,
         tickScheduled: false,
+        previousActiveTab: '',
     };
 
     const SELECTORS = {
@@ -57,6 +58,63 @@
             revokedOk: zh ? '分享链接已撤销' : 'Share link revoked.',
         };
         return copy[key] || key;
+    }
+
+    function getAppMainContent() {
+        return document.querySelector('.main-content');
+    }
+
+    function getShareOverlay(root = document) {
+        return root.querySelector('.na-share-overlay') || document.querySelector('.na-share-overlay');
+    }
+
+    function getActiveTab() {
+        const active = document.querySelector('.side-menu .is-active, .side-menu .el-menu-item.is-active');
+        return active?.getAttribute('index') || active?.dataset?.index || active?.textContent?.trim() || '';
+    }
+
+    function dispatchMenuSelect(index) {
+        const menu = document.querySelector('.side-menu');
+        if (!menu || !index) return;
+        const item = menu.querySelector(`[index="${CSS.escape(index)}"]`);
+        if (item instanceof HTMLElement) item.click();
+    }
+
+    function mountManagerInMainContent(root) {
+        const mainContent = getAppMainContent();
+        const overlay = getShareOverlay(root);
+        if (!mainContent || !overlay) return false;
+
+        if (overlay.parentElement !== mainContent) {
+            mainContent.appendChild(overlay);
+        }
+        Array.from(mainContent.children).forEach((child) => {
+            if (child !== overlay) child.classList.add('na-share-view-hidden');
+        });
+        return true;
+    }
+
+    function unmountManagerFromMainContent(root) {
+        const overlay = getShareOverlay(root);
+        const mainContent = getAppMainContent();
+        if (mainContent) {
+            Array.from(mainContent.children).forEach((child) => {
+                child.classList.remove('na-share-view-hidden');
+            });
+        }
+        if (overlay && overlay.parentElement !== root) {
+            root.insertBefore(overlay, root.querySelector('.na-share-dialog-backdrop'));
+        }
+    }
+
+    function isManagerOpen() {
+        return !!document.querySelector('.na-share-overlay.is-open');
+    }
+
+    function handleNativeMenuClick(event) {
+        const menuItem = event.target.closest?.('.side-menu .el-menu-item, .side-menu .el-sub-menu__title');
+        if (!menuItem || menuItem.classList.contains(SELECTORS.navInserted)) return;
+        if (isManagerOpen()) closeManager({ restorePrevious: false });
     }
 
     function isAuthenticatedSurface() {
@@ -216,15 +274,30 @@
     function selectedVaultIds() {
         const ids = new Set();
         document.querySelectorAll('[data-id]').forEach((node) => {
-            if (node.querySelector('.vault-card.is-selected') || node.classList.contains('is-selected')) {
-                const id = node.getAttribute('data-id');
-                if (id && !id.startsWith('tmp_')) ids.add(id);
+            const id = node.getAttribute('data-id');
+            if (!id || id.startsWith('tmp_')) return;
+
+            if (
+                node.classList.contains('is-selected') ||
+                node.matches('.vault-card.is-selected') ||
+                node.querySelector('.vault-card.is-selected, .is-selected')
+            ) {
+                ids.add(id);
             }
         });
         return Array.from(ids);
     }
 
     function findBulkToolbar() {
+        const batchActions = Array.from(document.querySelectorAll('.batch-actions')).find((node) => {
+            const text = node.textContent || '';
+            const buttons = Array.from(node.querySelectorAll('button'));
+            return /selected|已选择|选中/.test(text)
+                && buttons.some((button) => isDeleteButton(button))
+                && buttons.some((button) => isCancelButton(button));
+        });
+        if (batchActions) return batchActions;
+
         const candidates = Array.from(document.querySelectorAll('div, section, header')).filter((node) => {
             const text = node.textContent || '';
             return /selected|已选择|选中|Delete|删除/.test(text) && node.querySelector('button');
@@ -233,9 +306,20 @@
             .sort((a, b) => a.querySelectorAll('button').length - b.querySelectorAll('button').length)
             .find((node) => {
                 const buttons = Array.from(node.querySelectorAll('button'));
-                return buttons.some((button) => /Delete|删除/.test(button.textContent || ''))
-                    && buttons.some((button) => /Cancel|取消/.test(button.textContent || ''));
+                return buttons.some((button) => isDeleteButton(button))
+                    && buttons.some((button) => isCancelButton(button));
             });
+    }
+
+    function isDeleteButton(button) {
+        const text = button.textContent || '';
+        return /Delete|删除/.test(text)
+            || button.classList.contains('el-button--danger')
+            || button.getAttribute('type') === 'danger';
+    }
+
+    function isCancelButton(button) {
+        return /Cancel|取消/.test(button.textContent || '');
     }
 
     function injectBatchButton() {
@@ -251,8 +335,8 @@
         if (!toolbar) return;
 
         const buttons = Array.from(toolbar.querySelectorAll('button'));
-        const deleteButton = buttons.find((button) => /Delete|删除/.test(button.textContent || ''));
-        const cancelButton = buttons.find((button) => /Cancel|取消/.test(button.textContent || ''));
+        const deleteButton = buttons.find((button) => isDeleteButton(button));
+        const cancelButton = buttons.find((button) => isCancelButton(button));
         if (!deleteButton || !cancelButton) return;
 
         const button = existing || document.createElement('button');
@@ -262,10 +346,9 @@
         button.disabled = STATE.batchBusy;
         button.onclick = createBatchShares;
 
-        if (!existing || button.parentElement !== toolbar) {
-            toolbar.insertBefore(button, cancelButton);
-        } else if (button.previousElementSibling !== deleteButton) {
-            toolbar.insertBefore(button, cancelButton);
+        const desiredNext = deleteButton.nextSibling;
+        if (!existing || button.parentElement !== toolbar || desiredNext !== button) {
+            toolbar.insertBefore(button, desiredNext);
         }
     }
 
@@ -288,26 +371,33 @@
 
     function openManager() {
         const root = ensureRoot();
-        root.querySelector('.na-share-overlay').classList.add('is-open');
-        root.querySelector('.na-share-overlay').setAttribute('aria-hidden', 'false');
+        const overlay = getShareOverlay(root);
+        STATE.previousActiveTab = getActiveTab();
+        mountManagerInMainContent(root);
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
         document.querySelectorAll(`.${SELECTORS.navInserted}`).forEach((node) => node.classList.add('is-active'));
         loadShares();
     }
 
-    function closeManager() {
+    function closeManager({ restorePrevious = true } = {}) {
         const root = ensureRoot();
-        root.querySelector('.na-share-overlay').classList.remove('is-open');
-        root.querySelector('.na-share-overlay').setAttribute('aria-hidden', 'true');
+        const overlay = getShareOverlay(root);
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
         document.querySelectorAll(`.${SELECTORS.navInserted}`).forEach((node) => node.classList.remove('is-active'));
+        unmountManagerFromMainContent(root);
+        if (restorePrevious) dispatchMenuSelect(STATE.previousActiveTab || 'vault');
     }
 
     function renderShares() {
         const root = ensureRoot();
-        root.querySelectorAll('[data-na-share-filter]').forEach((button) => {
+        const overlay = getShareOverlay(root);
+        overlay.querySelectorAll('[data-na-share-filter]').forEach((button) => {
             button.classList.toggle('is-active', button.dataset.naShareFilter === STATE.filter);
         });
 
-        const list = root.querySelector('[data-na-share-list]');
+        const list = overlay.querySelector('[data-na-share-list]');
         if (STATE.loading) {
             list.innerHTML = `<div class="na-share-empty">${escapeHtml(t('refresh'))}...</div>`;
             return;
@@ -473,6 +563,10 @@
         ensureRoot();
         injectNav();
         injectBatchButton();
+        const overlay = document.querySelector('.na-share-overlay.is-open');
+        if (overlay) {
+            mountManagerInMainContent(ensureRoot());
+        }
     }
 
     function scheduleTick() {
@@ -490,6 +584,7 @@
         scheduleTick();
         const observer = new MutationObserver(scheduleTick);
         observer.observe(document.documentElement, { childList: true, subtree: true });
+        document.addEventListener('click', handleNativeMenuClick);
         window.addEventListener('online', scheduleTick);
         window.addEventListener('resize', scheduleTick);
     }

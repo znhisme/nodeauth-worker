@@ -7,17 +7,22 @@
     align-items: center;
     background: transparent;
     border: 0;
-    border-radius: 6px;
+    border-radius: 0;
+    box-sizing: border-box;
     color: var(--el-menu-text-color, var(--el-text-color-primary, #303133));
     cursor: pointer;
     display: flex;
     font: inherit;
-    gap: 12px;
-    height: 44px;
-    margin: 4px 8px;
+    font-size: var(--el-menu-item-font-size, 14px);
+    font-weight: 400;
+    gap: 0;
+    height: var(--el-menu-item-height, 56px);
+    line-height: var(--el-menu-item-height, 56px);
+    margin: 0;
+    min-width: 0;
     padding: 0 20px;
     text-align: left;
-    width: calc(100% - 16px);
+    width: 100%;
 }
 
 .na-share-nav:hover,
@@ -27,11 +32,30 @@
 }
 
 .na-share-nav__icon {
+    align-items: center;
+    color: inherit;
+    display: inline-flex;
+    flex-shrink: 0;
     font-size: 18px;
+    height: 1em;
+    justify-content: center;
     line-height: 1;
+    margin-right: 5px;
+    width: 24px;
+}
+
+.na-share-nav__icon svg {
+    display: block;
+    height: 18px;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    width: 18px;
 }
 
 .na-share-nav__text {
+    color: inherit;
+    flex: 1;
+    line-height: inherit;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -54,6 +78,10 @@
     position: fixed;
     right: 20px;
     z-index: 2200;
+}
+
+.na-share-view-hidden {
+    display: none !important;
 }
 
 .na-share-batch-button {
@@ -84,14 +112,12 @@
 
 .na-share-overlay {
     background: var(--el-bg-color, #fff);
-    bottom: 0;
     display: none;
-    left: 0;
-    overflow: auto;
-    position: fixed;
-    right: 0;
-    top: 0;
-    z-index: 3000;
+    min-height: 100%;
+    overflow: visible;
+    position: relative;
+    width: 100%;
+    z-index: 1;
 }
 
 .na-share-overlay.is-open {
@@ -367,4 +393,3 @@
         display: none;
     }
 }
-

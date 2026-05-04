@@ -194,6 +194,17 @@ interface Migration {
     postgres?: string;
 }
 
+function isMigrationStatementAlreadyApplied(error: unknown): boolean {
+    const msg = ((error as { message?: string })?.message || '').toLowerCase();
+    return (
+        msg.includes('duplicate column') ||
+        msg.includes('already exists') ||
+        msg.includes('duplicate key') ||
+        msg.includes('duplicate name') ||
+        msg.includes('index') && msg.includes('exists')
+    );
+}
+
 const MIGRATIONS: Migration[] = [
     {
         version: 1,
@@ -371,7 +382,6 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -412,7 +422,6 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -453,7 +462,6 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -494,7 +502,6 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `
@@ -673,7 +680,16 @@ export async function migrateDatabase(db: DbExecutor) {
             const statements = engineSql.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
             for (const rawSql of statements) {
                 const sql = transformSqlForDialect(rawSql, engine);
-                await db.exec(sql);
+                try {
+                    await db.exec(sql);
+                } catch (e: any) {
+                    if (isMigrationStatementAlreadyApplied(e)) {
+                        logger.info(`[Database] Skip existing statement in v${m.version}: ${rawSql.slice(0, 80)}`);
+                        continue;
+                    }
+
+                    throw e;
+                }
             }
             // 使用插入或替换
             const updateMetaRaw = engine === 'postgres'
@@ -684,8 +700,7 @@ export async function migrateDatabase(db: DbExecutor) {
 
             await db.prepare(updateMeta).run(m.version.toString());
         } catch (e: any) {
-            const msg = e.message?.toLowerCase() || '';
-            if (msg.includes('duplicate column') || msg.includes('already exists') || msg.includes('duplicate key')) {
+            if (isMigrationStatementAlreadyApplied(e)) {
                 logger.info(`[Database] Skip existing change in v${m.version}`);
                 const updateMetaRaw = engine === 'postgres'
                     ? 'INSERT INTO _schema_metadata ("key", "value") VALUES (\'version\', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value'

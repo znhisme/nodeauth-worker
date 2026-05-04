@@ -6,16 +6,36 @@ import { createShareService } from '@/features/share/shareService';
 import { migrateDatabase } from '@/shared/db/migrator';
 import { D1Executor } from '@/shared/db/d1Executor';
 
+const migrationPromises = new WeakMap<object, Promise<void>>();
+
+async function ensureDatabaseMigrated(d1: any): Promise<void> {
+    const executor = new D1Executor(d1);
+
+    if (!d1 || (typeof d1 !== 'object' && typeof d1 !== 'function')) {
+        await migrateDatabase(executor);
+        return;
+    }
+
+    let migration = migrationPromises.get(d1);
+    if (!migration) {
+        migration = migrateDatabase(executor).catch((error) => {
+            migrationPromises.delete(d1);
+            throw error;
+        });
+        migrationPromises.set(d1, migration);
+    }
+
+    await migration;
+}
+
 export default {
     async fetch(request: Request, env: any, ctx: any) {
         // Initialize D1 driver
         const db = drizzle(env.DB, { schema });
 
-        // 自愈性迁移逻辑：使用标准的 D1Executor
-        const executor = new D1Executor(env.DB);
-
-        // 生产环境使用 waitUntil 异步执行迁移检查
-        ctx.waitUntil(migrateDatabase(executor));
+        // Share-link writes depend on the latest schema immediately after deploys.
+        // Run migrations before routing so first traffic cannot race new columns/indexes.
+        await ensureDatabaseMigrated(env.DB);
 
         // Pass specialized DB and env vars to agnostic router
         const specializedEnv = {

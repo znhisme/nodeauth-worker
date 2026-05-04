@@ -128,10 +128,13 @@ describe('share cleanup runtime source contract', () => {
         const source = readFileSync(new URL('./worker.ts', import.meta.url), 'utf8');
 
         expect(source).toContain("import { createShareService } from '@/features/share/shareService';");
+        expect(source).toContain('async function ensureDatabaseMigrated');
+        expect(source).toContain('await ensureDatabaseMigrated(env.DB);');
         expect(source).toContain('async scheduled');
         expect(source).toContain('ctx.waitUntil(Promise.all([');
         expect(source).toContain('handleScheduledBackup(specializedEnv)');
         expect(source).toContain('createShareService(specializedEnv as any).cleanupShareState()');
+        expect(source).not.toContain('ctx.waitUntil(migrateDatabase(executor));');
     });
 
     it('keeps Docker daily backup cron and logs share cleanup counts only', () => {

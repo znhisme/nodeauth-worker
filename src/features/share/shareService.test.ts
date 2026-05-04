@@ -211,6 +211,30 @@ describe('ShareService', () => {
         expect(JSON.stringify(createInput)).not.toContain(result.rawAccessCode);
     });
 
+    it('defaults new share links to a 30 day expiration', async () => {
+        const now = 1000;
+        const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+        shareRepository.createReplacingShareLink.mockImplementation(async (input: any) => ({
+            replacedShares: [],
+            share: {
+                ...input,
+                id: 'share-1',
+            },
+        }));
+
+        const result = await service.createShare({
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            now,
+        } as any);
+
+        expect(shareRepository.createReplacingShareLink).toHaveBeenCalledWith(expect.objectContaining({
+            expiresAt: now + thirtyDaysMs,
+        }));
+        expect(result.share.expiresAt).toBe(String(now + thirtyDaysMs));
+    });
+
     it('latest-share-wins revokes older active shares before returning the new share and records safe audit metadata', async () => {
         const now = 2000;
         const oldShare = makeShareRecord({

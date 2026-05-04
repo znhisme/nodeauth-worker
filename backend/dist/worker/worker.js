@@ -7328,8 +7328,8 @@ init_config();
 // ../src/features/share/shareTypes.ts
 var SHARE_TOKEN_BYTES = 32;
 var SHARE_ACCESS_CODE_BYTES = 16;
-var SHARE_DEFAULT_TTL_SECONDS = 24 * 60 * 60;
-var SHARE_MAX_TTL_SECONDS = 7 * 24 * 60 * 60;
+var SHARE_DEFAULT_TTL_SECONDS = 30 * 24 * 60 * 60;
+var SHARE_MAX_TTL_SECONDS = 30 * 24 * 60 * 60;
 var SHARE_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1e3;
 var SHARE_RATE_LIMIT_MAX_ATTEMPTS = 5;
 var SHARE_RATE_LIMIT_LOCK_MS = 15 * 60 * 1e3;
@@ -8938,6 +8938,10 @@ var getBaseSchemaForEngine = (engine2) => {
   }
   return [...baseSchema, ...MYSQL_SHARE_BASE_SCHEMA];
 };
+function isMigrationStatementAlreadyApplied(error) {
+  const msg = (error?.message || "").toLowerCase();
+  return msg.includes("duplicate column") || msg.includes("already exists") || msg.includes("duplicate key") || msg.includes("duplicate name") || msg.includes("index") && msg.includes("exists");
+}
 var MIGRATIONS = [
   {
     version: 1,
@@ -9115,7 +9119,6 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9156,7 +9159,6 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9197,7 +9199,6 @@ var MIGRATIONS = [
             CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9238,7 +9239,6 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `
@@ -9394,14 +9394,21 @@ async function migrateDatabase(db) {
       const statements = engineSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
       for (const rawSql of statements) {
         const sql3 = transformSqlForDialect(rawSql, engine2);
-        await db.exec(sql3);
+        try {
+          await db.exec(sql3);
+        } catch (e) {
+          if (isMigrationStatementAlreadyApplied(e)) {
+            logger.info(`[Database] Skip existing statement in v${m.version}: ${rawSql.slice(0, 80)}`);
+            continue;
+          }
+          throw e;
+        }
       }
       const updateMetaRaw = engine2 === "postgres" ? `INSERT INTO _schema_metadata ("key", "value") VALUES ('version', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value` : "REPLACE INTO _schema_metadata (`key`, `value`) VALUES ('version', ?)";
       const updateMeta = transformSqlForDialect(updateMetaRaw, engine2);
       await db.prepare(updateMeta).run(m.version.toString());
     } catch (e) {
-      const msg = e.message?.toLowerCase() || "";
-      if (msg.includes("duplicate column") || msg.includes("already exists") || msg.includes("duplicate key")) {
+      if (isMigrationStatementAlreadyApplied(e)) {
         logger.info(`[Database] Skip existing change in v${m.version}`);
         const updateMetaRaw = engine2 === "postgres" ? `INSERT INTO _schema_metadata ("key", "value") VALUES ('version', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value` : "REPLACE INTO _schema_metadata (`key`, `value`) VALUES ('version', ?)";
         const updateMeta = transformSqlForDialect(updateMetaRaw, engine2);
@@ -9441,11 +9448,27 @@ var D1Executor = class {
 };
 
 // ../src/app/worker.ts
+var migrationPromises = /* @__PURE__ */ new WeakMap();
+async function ensureDatabaseMigrated(d1) {
+  const executor = new D1Executor(d1);
+  if (!d1 || typeof d1 !== "object" && typeof d1 !== "function") {
+    await migrateDatabase(executor);
+    return;
+  }
+  let migration = migrationPromises.get(d1);
+  if (!migration) {
+    migration = migrateDatabase(executor).catch((error) => {
+      migrationPromises.delete(d1);
+      throw error;
+    });
+    migrationPromises.set(d1, migration);
+  }
+  await migration;
+}
 var worker_default = {
   async fetch(request, env, ctx) {
     const db = drizzle(env.DB, { schema: sqlite_exports });
-    const executor = new D1Executor(env.DB);
-    ctx.waitUntil(migrateDatabase(executor));
+    await ensureDatabaseMigrated(env.DB);
     const specializedEnv = {
       ...env,
       DB: db,
