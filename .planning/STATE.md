@@ -130,7 +130,7 @@ None yet.
 | 260504-i3a | fix Cloudflare D1 schema sync for active_share_key deployment | 2026-05-04 | 2861081 | [260504-i3a-fix-cloudflare-d1-schema-sync-for-active](./quick/260504-i3a-fix-cloudflare-d1-schema-sync-for-active/) |
 | 260504-h9f | fix Phase 04 latest-share-wins concurrency security gap | 2026-05-04 | 46f45c1 | [260504-h9f-fix-phase-04-latest-share-wins-concurren](./quick/260504-h9f-fix-phase-04-latest-share-wins-concurren/) |
 | 260504-5fy | commit and push share management UI fix and ignore local runtime files | 2026-05-03 | 2e3cf64 | [260504-5fy-commit-and-push-share-management-ui-fix-](./quick/260504-5fy-commit-and-push-share-management-ui-fix-/) |
-| 260504-ne8 | deploy local Docker with GitHub OAuth config | 2026-05-04 | uncommitted | [260504-ne8-docker-nodeauth-github-oauth](./quick/260504-ne8-docker-nodeauth-github-oauth/) |
+| 260504-ne8 | deploy local Docker with GitHub OAuth config | 2026-05-04 | 73ba696 | [260504-ne8-docker-nodeauth-github-oauth](./quick/260504-ne8-docker-nodeauth-github-oauth/) |
 
 ## Deferred Items
 
