@@ -147,3 +147,14 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 **Coverage:** 29/29 v1 requirements mapped.
 
 *Roadmap revised: 2026-05-02 after consolidating the feature into 3 phases*
+
+### Phase 5: 新增一个 API 功能：通过登录用户的 token 调用 API 自动导入账户，支持现有导入方式复用，但入口改为 API + 用户 token 认证
+
+**Goal:** Add an automation-friendly authenticated account import API by allowing a logged-in user's token to call the existing vault import route, while preserving cookie CSRF protection and existing import format behavior.
+**Requirements**: TBD
+**Depends on:** Phase 4
+**Plans:** 2 plans
+
+Plans:
+- [ ] Plan 05-01: Add cookie-or-Bearer authentication and prove Bearer import reuses VaultService.importAccounts()
+- [ ] Plan 05-02: Regenerate Worker, Docker, and Netlify backend bundles and assert generated Bearer import behavior
