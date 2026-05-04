@@ -546,11 +546,15 @@
         renderDialog();
     }
 
+    function getCreatedShareFromRow(row) {
+        return row?.share || row?.data?.share || row?.data || row || {};
+    }
+
     function renderDialog() {
         const root = ensureRoot();
         const body = root.querySelector('[data-na-share-dialog-body]');
         const successHtml = STATE.oneTimeResults.map((row, index) => {
-            const share = row.share || {};
+            const share = getCreatedShareFromRow(row);
             const publicUrl = share.publicUrl || share.url || share.shareUrl || '';
             const accessCode = share.rawAccessCode || share.accessCode || '';
             const label = `${share.item?.service || t('account')} ${share.item?.account || ''}`.trim();
@@ -583,7 +587,7 @@
 
     async function copyAllResults() {
         const text = STATE.oneTimeResults.map((row) => {
-            const share = row.share || {};
+            const share = getCreatedShareFromRow(row);
             const label = `${share.item?.service || t('account')} ${share.item?.account || ''}`.trim();
             const publicUrl = share.publicUrl || share.url || share.shareUrl || '';
             const accessCode = share.rawAccessCode || share.accessCode || '';

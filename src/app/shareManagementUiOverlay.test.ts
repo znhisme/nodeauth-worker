@@ -33,4 +33,14 @@ describe('share management UI overlay source contract', () => {
         expect(source).toContain('mainContent.appendChild(overlay);');
         expect(source).toContain("child.classList.add('na-share-view-hidden')");
     });
+
+    it('normalizes nested and flat batch success rows before rendering one-time link data', () => {
+        const source = readOverlaySource();
+
+        expect(source).toContain('function getCreatedShareFromRow(row)');
+        expect(source).toContain('return row?.share || row?.data?.share || row?.data || row || {};');
+        expect(source).toContain('const share = getCreatedShareFromRow(row);');
+        expect(source).toContain("share.publicUrl || share.url || share.shareUrl || ''");
+        expect(source).toContain("share.rawAccessCode || share.accessCode || ''");
+    });
 });
