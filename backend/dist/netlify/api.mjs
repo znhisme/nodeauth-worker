@@ -1619,14 +1619,21 @@ var SessionService = class {
 
 // ../src/shared/middleware/auth.ts
 async function authMiddleware(c, next) {
-  const token = getCookie(c, "auth_token");
-  if (!token) {
-    throw new AppError("no_session", 401);
-  }
-  const csrfCookie = getCookie(c, "csrf_token");
-  const csrfHeader = c.req.header("X-CSRF-Token");
-  if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-    throw new AppError("csrf_mismatch", 403);
+  const cookieToken = getCookie(c, "auth_token");
+  let token = cookieToken;
+  if (cookieToken) {
+    const csrfCookie = getCookie(c, "csrf_token");
+    const csrfHeader = c.req.header("X-CSRF-Token");
+    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+      throw new AppError("csrf_mismatch", 403);
+    }
+  } else {
+    const authorization = c.req.header("Authorization");
+    const bearerMatch = authorization?.match(/^Bearer\s+(.+)$/i);
+    token = bearerMatch?.[1]?.trim();
+    if (!token) {
+      throw new AppError("no_session", 401);
+    }
   }
   const payload = await verifySecureJWT(token, c.env.JWT_SECRET);
   if (!payload || !payload.userInfo) {
