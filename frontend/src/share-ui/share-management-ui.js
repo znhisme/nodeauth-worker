@@ -273,10 +273,16 @@
 
     function selectedVaultIds() {
         const ids = new Set();
+        const selectedCards = document.querySelectorAll('[data-id] .vault-card.is-selected, [data-id].is-selected, [data-id][aria-selected="true"]');
+        selectedCards.forEach((node) => {
+            const holder = node.closest('[data-id]');
+            const id = holder?.getAttribute('data-id');
+            if (id && !id.startsWith('tmp_')) ids.add(id);
+        });
+
         document.querySelectorAll('[data-id]').forEach((node) => {
             const id = node.getAttribute('data-id');
-            if (!id || id.startsWith('tmp_')) return;
-
+            if (!id || id.startsWith('tmp_') || ids.has(id)) return;
             if (
                 node.classList.contains('is-selected') ||
                 node.matches('.vault-card.is-selected') ||
@@ -289,10 +295,9 @@
     }
 
     function findBulkToolbar() {
-        const batchActions = Array.from(document.querySelectorAll('.batch-actions')).find((node) => {
-            const text = node.textContent || '';
+        const batchActions = Array.from(document.querySelectorAll('.vault-list-toolbar .batch-actions, .batch-actions')).find((node) => {
             const buttons = Array.from(node.querySelectorAll('button'));
-            return /selected|已选择|选中/.test(text)
+            return buttons.length >= 2
                 && buttons.some((button) => isDeleteButton(button))
                 && buttons.some((button) => isCancelButton(button));
         });

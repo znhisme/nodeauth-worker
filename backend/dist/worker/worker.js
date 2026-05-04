@@ -9249,6 +9249,9 @@ var MIGRATIONS = [
     sqlite: `
             ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
             UPDATE share_links
+                SET active_share_key = NULL
+                WHERE active_share_key IS NOT NULL;
+            UPDATE share_links
                 SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
                 WHERE revoked_at IS NULL
                     AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
@@ -9278,6 +9281,9 @@ var MIGRATIONS = [
         `,
     d1: `
             ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET active_share_key = NULL
+                WHERE active_share_key IS NOT NULL;
             UPDATE share_links
                 SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
                 WHERE revoked_at IS NULL
@@ -9309,6 +9315,9 @@ var MIGRATIONS = [
     mysql: `
             ALTER TABLE share_links ADD COLUMN active_share_key VARCHAR(320);
             UPDATE share_links
+                SET active_share_key = NULL
+                WHERE active_share_key IS NOT NULL;
+            UPDATE share_links
                 SET revoked_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
                 WHERE revoked_at IS NULL
                     AND expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
@@ -9338,6 +9347,9 @@ var MIGRATIONS = [
         `,
     postgres: `
             ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET active_share_key = NULL
+                WHERE active_share_key IS NOT NULL;
             UPDATE share_links
                 SET revoked_at = EXTRACT(EPOCH FROM NOW()) * 1000
                 WHERE revoked_at IS NULL
