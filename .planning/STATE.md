@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 04 verified after latest-share-wins security remediation
-last_updated: "2026-05-04T13:03:52.440Z"
-last_activity: 2026-05-04 -- Phase 5 planning complete
+stopped_at: Completed 05-api-token-api-api-token-01-PLAN.md
+last_updated: "2026-05-04T13:15:09.457Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 30
-  completed_plans: 28
-  percent: 93
+  completed_plans: 29
+  percent: 97
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-02)
 
 **Core value:** A NodeAuth user can create a safe, revocable HTTP link for one account item and a friend can use that link to access only that shared account's login details.
-**Current focus:** Phase 04 — ui-1-2
+**Current focus:** Phase 05 — api-token-api-api-token
 
 ## Current Position
 
-Phase: 04 (ui-1-2) — VERIFIED AFTER UAT GAP CLOSURE
-Plan: 4 of 4
+Phase: 05 (api-token-api-api-token) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-05-04 -- Phase 5 planning complete
+Last activity: 2026-05-04
 
-Progress: [██████████] 100%
+Progress: [██████████] 97%
 
 ## Performance Metrics
 
@@ -70,6 +70,7 @@ Progress: [██████████] 100%
 | Phase 03-cleanup-compatibility-and-hardening P09 | 5min | 2 tasks | 8 files |
 | Phase 03 P10 | 8min | 2 tasks | 4 files |
 | Phase 03 P11 | 5min | 2 tasks | 6 files |
+| Phase 05-api-token-api-api-token P01 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 03-cleanup-compatibility-and-hardening]: Strip non-finite owner create timing values to undefined at the route boundary rather than changing the public request contract or service API.
 - [Phase 03-cleanup-compatibility-and-hardening]: Mirror the existing revokeShare() audit contract in revokeShareForOwner() with revokedAt-only metadata.
 - [Phase 03-cleanup-compatibility-and-hardening]: Leave .planning/source-provenance.md unchanged because source-map verification passed after regeneration.
+- [Phase 05-api-token-api-api-token]: Use the existing /api/vault/import route for API-token import rather than adding a second parser or endpoint. — This preserves existing import parsing and keeps automation clients on the same VaultService.importAccounts() contract as browser imports.
+- [Phase 05-api-token-api-api-token]: Prefer cookie auth over Bearer auth when both are present so browser requests still require double-submit CSRF. — Cookie precedence prevents an Authorization header from weakening CSRF enforcement for cookie-authenticated browser requests.
 
 ### Roadmap Evolution
 
@@ -144,6 +147,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-03T20:59:48.451Z
-Stopped at: Phase 04 verified after latest-share-wins security remediation
-Resume file: .planning/phases/04-ui-1-2/04-VERIFICATION.md
+Last session: 2026-05-04T13:14:40.480Z
+Stopped at: Completed 05-api-token-api-api-token-01-PLAN.md
+Resume file: None

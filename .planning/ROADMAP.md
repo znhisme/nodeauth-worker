@@ -109,6 +109,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
 | 3. Cleanup, Compatibility, and Hardening | 11/11 | Complete | 2026-05-03 |
 | 4. 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享 | 3/3 | Complete | 2026-05-04 |
+| 5. 新增一个 API 功能：通过登录用户的 token 调用 API 自动导入账户，支持现有导入方式复用，但入口改为 API + 用户 token 认证 | 1/2 | In Progress | - |
 
 ## Requirement Coverage
 
@@ -156,5 +157,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 **Plans:** 2 plans
 
 Plans:
-- [ ] Plan 05-01: Add cookie-or-Bearer authentication and prove Bearer import reuses VaultService.importAccounts()
+- [x] Plan 05-01: Add cookie-or-Bearer authentication and prove Bearer import reuses VaultService.importAccounts()
 - [ ] Plan 05-02: Regenerate Worker, Docker, and Netlify backend bundles and assert generated Bearer import behavior
