@@ -205,6 +205,23 @@ function isMigrationStatementAlreadyApplied(error: unknown): boolean {
     );
 }
 
+async function applyMigrationStatements(db: DbExecutor, engine: string, rawSql: string, label: string): Promise<void> {
+    const statements = rawSql.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
+    for (const rawStatement of statements) {
+        const sql = transformSqlForDialect(rawStatement, engine);
+        try {
+            await db.exec(sql);
+        } catch (e: any) {
+            if (isMigrationStatementAlreadyApplied(e)) {
+                logger.info(`[Database] Skip existing statement in ${label}: ${rawStatement.slice(0, 80)}`);
+                continue;
+            }
+
+            throw e;
+        }
+    }
+}
+
 const MIGRATIONS: Migration[] = [
     {
         version: 1,
@@ -644,6 +661,20 @@ const MIGRATIONS: Migration[] = [
     }
 ];
 
+async function ensureActiveShareKeyRepair(db: DbExecutor, engine: string, currentVersion: number): Promise<void> {
+    if (currentVersion < 14) {
+        return;
+    }
+
+    const repairMigration = MIGRATIONS.find((migration) => migration.version === 14);
+    if (!repairMigration) {
+        return;
+    }
+
+    const engineSql = (repairMigration as any)[engine] || repairMigration.sqlite;
+    await applyMigrationStatements(db, engine, engineSql, 'active-share-key repair');
+}
+
 /**
  * 统一迁移入口：支持多端兼容
  */
@@ -680,7 +711,10 @@ export async function migrateDatabase(db: DbExecutor) {
 
     const pending = MIGRATIONS.filter(m => m.version > currentVersion).sort((a, b) => a.version - b.version);
 
-    if (pending.length === 0) return;
+    if (pending.length === 0) {
+        await ensureActiveShareKeyRepair(db, engine, currentVersion);
+        return;
+    }
 
     logger.info(`[Database] Current engine: ${engine}. version: ${currentVersion}. Migrating to v${pending[pending.length - 1].version}...`);
 
@@ -689,20 +723,7 @@ export async function migrateDatabase(db: DbExecutor) {
         try {
             // 将复合 SQL 按分号拆分执行
             const engineSql = (m as any)[engine] || m.sqlite;
-            const statements = engineSql.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0);
-            for (const rawSql of statements) {
-                const sql = transformSqlForDialect(rawSql, engine);
-                try {
-                    await db.exec(sql);
-                } catch (e: any) {
-                    if (isMigrationStatementAlreadyApplied(e)) {
-                        logger.info(`[Database] Skip existing statement in v${m.version}: ${rawSql.slice(0, 80)}`);
-                        continue;
-                    }
-
-                    throw e;
-                }
-            }
+            await applyMigrationStatements(db, engine, engineSql, `v${m.version}`);
             // 使用插入或替换
             const updateMetaRaw = engine === 'postgres'
                 ? 'INSERT INTO _schema_metadata ("key", "value") VALUES (\'version\', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value'
@@ -724,4 +745,5 @@ export async function migrateDatabase(db: DbExecutor) {
             throw e;
         }
     }
+
 }

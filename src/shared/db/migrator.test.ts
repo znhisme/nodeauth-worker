@@ -145,4 +145,71 @@ describe('migrateDatabase', () => {
         expect(version.value).toBe('14');
         expect(index).toBeTruthy();
     });
+
+    it('repairs active_share_key when metadata says v14 but the column is missing', async () => {
+        const db = new Database(':memory:');
+        databases.push(db);
+        db.exec(`
+            CREATE TABLE _schema_metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+            INSERT INTO _schema_metadata (key, value) VALUES ('version', '14');
+            CREATE TABLE vault (
+                id TEXT PRIMARY KEY,
+                service TEXT NOT NULL,
+                account TEXT NOT NULL,
+                secret TEXT NOT NULL,
+                created_at INTEGER,
+                deleted_at INTEGER
+            );
+            CREATE TABLE share_links (
+                id TEXT PRIMARY KEY,
+                vault_item_id TEXT NOT NULL,
+                owner_id TEXT NOT NULL,
+                token_hash TEXT NOT NULL,
+                access_code_hash TEXT NOT NULL,
+                expires_at INTEGER NOT NULL,
+                revoked_at INTEGER,
+                created_at INTEGER NOT NULL,
+                last_accessed_at INTEGER,
+                access_count INTEGER DEFAULT 0
+            );
+            INSERT INTO share_links (
+                id,
+                vault_item_id,
+                owner_id,
+                token_hash,
+                access_code_hash,
+                expires_at,
+                revoked_at,
+                created_at,
+                last_accessed_at,
+                access_count
+            ) VALUES (
+                'share-1',
+                'vault-1',
+                'owner-1',
+                'token-hash',
+                'access-code-hash',
+                4102444800000,
+                NULL,
+                1000,
+                NULL,
+                0
+            );
+        `);
+
+        await migrateDatabase(new SqliteExecutor(db));
+
+        const columns = db.prepare('PRAGMA table_info(share_links)').all() as any[];
+        const share = db.prepare('SELECT active_share_key FROM share_links WHERE id = ?').get('share-1') as any;
+        const version = db.prepare("SELECT value FROM _schema_metadata WHERE key = 'version'").get() as any;
+        const index = db.prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'idx_share_links_active_share_key'").get();
+
+        expect(columns.map((column) => column.name)).toContain('active_share_key');
+        expect(share.active_share_key).toBe('owner-1:vault-1');
+        expect(version.value).toBe('14');
+        expect(index).toBeTruthy();
+    });
 });

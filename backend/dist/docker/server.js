@@ -9024,6 +9024,21 @@ function isMigrationStatementAlreadyApplied(error) {
   const msg = (error?.message || "").toLowerCase();
   return msg.includes("duplicate column") || msg.includes("already exists") || msg.includes("duplicate key") || msg.includes("duplicate name") || msg.includes("index") && msg.includes("exists");
 }
+async function applyMigrationStatements(db2, engine2, rawSql, label) {
+  const statements = rawSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
+  for (const rawStatement of statements) {
+    const sql3 = transformSqlForDialect(rawStatement, engine2);
+    try {
+      await db2.exec(sql3);
+    } catch (e) {
+      if (isMigrationStatementAlreadyApplied(e)) {
+        logger.info(`[Database] Skip existing statement in ${label}: ${rawStatement.slice(0, 80)}`);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 var MIGRATIONS = [
   {
     version: 1,
@@ -9462,6 +9477,17 @@ var MIGRATIONS = [
         `
   }
 ];
+async function ensureActiveShareKeyRepair(db2, engine2, currentVersion) {
+  if (currentVersion < 14) {
+    return;
+  }
+  const repairMigration = MIGRATIONS.find((migration) => migration.version === 14);
+  if (!repairMigration) {
+    return;
+  }
+  const engineSql = repairMigration[engine2] || repairMigration.sqlite;
+  await applyMigrationStatements(db2, engine2, engineSql, "active-share-key repair");
+}
 async function migrateDatabase(db2) {
   const engine2 = db2.engine;
   const createMetaTable = transformSqlForDialect(`CREATE TABLE IF NOT EXISTS _schema_metadata (\`key\` TEXT PRIMARY KEY, \`value\` TEXT)`, engine2);
@@ -9479,25 +9505,16 @@ async function migrateDatabase(db2) {
   const row = await db2.prepare(queryMeta).get();
   const currentVersion = row ? parseInt(row.value, 10) : 0;
   const pending = MIGRATIONS.filter((m) => m.version > currentVersion).sort((a, b) => a.version - b.version);
-  if (pending.length === 0) return;
+  if (pending.length === 0) {
+    await ensureActiveShareKeyRepair(db2, engine2, currentVersion);
+    return;
+  }
   logger.info(`[Database] Current engine: ${engine2}. version: ${currentVersion}. Migrating to v${pending[pending.length - 1].version}...`);
   for (const m of pending) {
     logger.info(`[Database] Applying v${m.version}: ${m.name}`);
     try {
       const engineSql = m[engine2] || m.sqlite;
-      const statements = engineSql.split(";").map((s) => s.trim()).filter((s) => s.length > 0);
-      for (const rawSql of statements) {
-        const sql3 = transformSqlForDialect(rawSql, engine2);
-        try {
-          await db2.exec(sql3);
-        } catch (e) {
-          if (isMigrationStatementAlreadyApplied(e)) {
-            logger.info(`[Database] Skip existing statement in v${m.version}: ${rawSql.slice(0, 80)}`);
-            continue;
-          }
-          throw e;
-        }
-      }
+      await applyMigrationStatements(db2, engine2, engineSql, `v${m.version}`);
       const updateMetaRaw = engine2 === "postgres" ? `INSERT INTO _schema_metadata ("key", "value") VALUES ('version', ?) ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED.value` : "REPLACE INTO _schema_metadata (`key`, `value`) VALUES ('version', ?)";
       const updateMeta = transformSqlForDialect(updateMetaRaw, engine2);
       await db2.prepare(updateMeta).run(m.version.toString());
