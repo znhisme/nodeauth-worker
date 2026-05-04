@@ -9,9 +9,18 @@ const share = new Hono<{ Bindings: EnvBindings, Variables: { user: any } }>();
 
 const getService = (c: any) => createShareService(c.env);
 
-share.post('/', authMiddleware, async (c) => {
-    const user = c.get('user');
+const getOwnerIdentity = (c: any): { ownerId: string; ownerAliases: string[] } => {
+    const user = c.get('user') || {};
     const ownerId = user.email || user.id;
+    const ownerAliases = Array.from(new Set([ownerId, user.email, user.id, user.username]
+        .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .map((value: string) => value.trim())));
+
+    return { ownerId, ownerAliases };
+};
+
+share.post('/', authMiddleware, async (c) => {
+    const { ownerId, ownerAliases } = getOwnerIdentity(c);
     const body = await c.req.json().catch(() => ({}));
 
     if (typeof body.vaultItemId !== 'string' || body.vaultItemId.trim() === '') {
@@ -24,6 +33,7 @@ share.post('/', authMiddleware, async (c) => {
     const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
     const share = await service.createShareForOwner({
         ownerId,
+        ownerAliases,
         vaultItemId: body.vaultItemId,
         ttlSeconds,
         expiresAt,
@@ -34,17 +44,15 @@ share.post('/', authMiddleware, async (c) => {
 });
 
 share.get('/', authMiddleware, async (c) => {
-    const user = c.get('user');
-    const ownerId = user.email || user.id;
+    const { ownerId, ownerAliases } = getOwnerIdentity(c);
     const service = getService(c);
-    const shares = await service.listSharesForOwner(ownerId);
+    const shares = await service.listSharesForOwner(ownerId, Date.now(), ownerAliases);
 
     return c.json({ success: true, shares });
 });
 
 share.post('/batch', authMiddleware, async (c) => {
-    const user = c.get('user');
-    const ownerId = user.email || user.id;
+    const { ownerId, ownerAliases } = getOwnerIdentity(c);
     const body = await c.req.json().catch(() => ({}));
 
     if (!Array.isArray(body.vaultItemIds) || body.vaultItemIds.length === 0 || body.vaultItemIds.some((id: unknown) => typeof id !== 'string' || id.trim() === '')) {
@@ -61,6 +69,7 @@ share.post('/batch', authMiddleware, async (c) => {
     const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
     const result = await service.createSharesForOwnerBatch({
         ownerId,
+        ownerAliases,
         vaultItemIds: body.vaultItemIds,
         ttlSeconds,
         expiresAt,
@@ -71,19 +80,17 @@ share.post('/batch', authMiddleware, async (c) => {
 });
 
 share.get('/:id', authMiddleware, async (c) => {
-    const user = c.get('user');
-    const ownerId = user.email || user.id;
+    const { ownerId, ownerAliases } = getOwnerIdentity(c);
     const service = getService(c);
-    const share = await service.getShareForOwner(ownerId, c.req.param('id'));
+    const share = await service.getShareForOwner(ownerId, c.req.param('id'), Date.now(), ownerAliases);
 
     return c.json({ success: true, share });
 });
 
 share.delete('/:id', authMiddleware, async (c) => {
-    const user = c.get('user');
-    const ownerId = user.email || user.id;
+    const { ownerId, ownerAliases } = getOwnerIdentity(c);
     const service = getService(c);
-    const share = await service.revokeShareForOwner(ownerId, c.req.param('id'));
+    const share = await service.revokeShareForOwner(ownerId, c.req.param('id'), Date.now(), ownerAliases);
 
     return c.json({
         success: true,

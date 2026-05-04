@@ -43,6 +43,19 @@ function toShareStatus(share: Pick<ShareLinkRecord, 'expiresAt' | 'revokedAt'>, 
     return share.revokedAt != null ? 'revoked' : (Number(share.expiresAt) <= now ? 'expired' : 'active');
 }
 
+function getOwnerCandidates(ownerId: string, ownerAliases: string[] = []): string[] {
+    return Array.from(new Set([ownerId, ...ownerAliases]
+        .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .map((value) => value.trim())));
+}
+
+function resolveEffectiveOwnerId(ownerId: string, ownerAliases: string[] | undefined, vaultItem: { createdBy?: string | null }): string {
+    const createdBy = typeof vaultItem.createdBy === 'string' ? vaultItem.createdBy.trim() : '';
+    return createdBy && getOwnerCandidates(ownerId, ownerAliases).includes(createdBy)
+        ? createdBy
+        : ownerId;
+}
+
 export class ShareService {
     constructor(
         private env: EnvBindings,
@@ -81,10 +94,11 @@ export class ShareService {
             throw new AppError('share_item_inaccessible', 404);
         }
 
-        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId, input.ownerAliases);
         if (!vaultItem) {
             throw new AppError('share_item_inaccessible', 404);
         }
+        const ownerId = resolveEffectiveOwnerId(input.ownerId, input.ownerAliases, vaultItem);
 
         const rawToken = generateShareToken();
         const rawAccessCode = generateAccessCode();
@@ -96,7 +110,7 @@ export class ShareService {
         const { share, replacedShares } = await this.shareRepository.createReplacingShareLink({
             id: shareId,
             vaultItemId: input.vaultItemId,
-            ownerId: input.ownerId,
+            ownerId,
             tokenHash,
             accessCodeHash,
             expiresAt,
@@ -113,7 +127,7 @@ export class ShareService {
                 eventType: 'revoked',
                 actorType: 'owner',
                 eventAt: now,
-                ownerId: input.ownerId,
+                ownerId,
                 ipHash: null,
                 userAgentHash: null,
                 metadata: toMetadata({
@@ -132,7 +146,7 @@ export class ShareService {
             eventType: 'created',
             actorType: 'owner',
             eventAt: now,
-            ownerId: input.ownerId,
+            ownerId,
             ipHash: null,
             userAgentHash: null,
             metadata: toMetadata({
@@ -162,7 +176,7 @@ export class ShareService {
 
     async createShareForOwner(input: CreateShareInput): Promise<OwnerShareCreatedView> {
         const created = await this.createShare(input);
-        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, input.ownerId);
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(input.vaultItemId, created.share.ownerId, input.ownerAliases);
         if (!vaultItem) {
             throw new AppError('share_item_inaccessible', 404);
         }
@@ -183,6 +197,7 @@ export class ShareService {
             try {
                 const share = await this.createShareForOwner({
                     ownerId: input.ownerId,
+                    ownerAliases: input.ownerAliases,
                     vaultItemId,
                     ttlSeconds: input.ttlSeconds,
                     expiresAt: input.expiresAt,
@@ -198,12 +213,12 @@ export class ShareService {
         return { successes, failures };
     }
 
-    async listSharesForOwner(ownerId: string, now = Date.now()): Promise<OwnerShareMetadataView[]> {
-        const shares = await this.shareRepository.listForOwner(ownerId);
+    async listSharesForOwner(ownerId: string, now = Date.now(), ownerAliases: string[] = []): Promise<OwnerShareMetadataView[]> {
+        const shares = await this.shareRepository.listForOwner(ownerId, ownerAliases);
         const views: OwnerShareMetadataView[] = [];
 
         for (const share of shares) {
-            const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+            const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId, ownerAliases);
             if (!vaultItem) {
                 continue;
             }
@@ -214,13 +229,13 @@ export class ShareService {
         return views;
     }
 
-    async getShareForOwner(ownerId: string, shareId: string, now = Date.now()): Promise<OwnerShareMetadataView> {
-        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+    async getShareForOwner(ownerId: string, shareId: string, now = Date.now(), ownerAliases: string[] = []): Promise<OwnerShareMetadataView> {
+        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId, ownerAliases);
         if (!share) {
             throw new AppError('share_item_inaccessible', 404);
         }
 
-        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId, ownerAliases);
         if (!vaultItem) {
             throw new AppError('share_item_inaccessible', 404);
         }
@@ -228,18 +243,18 @@ export class ShareService {
         return this.toOwnerMetadataView(share as ShareLinkRecord, vaultItem, now);
     }
 
-    async revokeShareForOwner(ownerId: string, shareId: string, now = Date.now()): Promise<OwnerShareMetadataView> {
-        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId);
+    async revokeShareForOwner(ownerId: string, shareId: string, now = Date.now(), ownerAliases: string[] = []): Promise<OwnerShareMetadataView> {
+        const share = await this.shareRepository.findByIdForOwner(shareId, ownerId, ownerAliases);
         if (!share) {
             throw new AppError('share_item_inaccessible', 404);
         }
 
-        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, ownerId);
+        const vaultItem = await this.vaultRepository.findActiveByIdForOwner(share.vaultItemId, share.ownerId, ownerAliases);
         if (!vaultItem) {
             throw new AppError('share_item_inaccessible', 404);
         }
 
-        const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now);
+        const revoked = await this.shareRepository.revokeForOwner(shareId, ownerId, now, ownerAliases);
         if (!revoked) {
             throw new AppError('share_item_inaccessible', 404);
         }
@@ -250,7 +265,7 @@ export class ShareService {
             eventType: 'revoked',
             actorType: 'owner',
             eventAt: now,
-            ownerId,
+            ownerId: share.ownerId,
             ipHash: null,
             userAgentHash: null,
             metadata: toMetadata({ revokedAt: now }),

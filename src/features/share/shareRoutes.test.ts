@@ -5,7 +5,7 @@ import type { EnvBindings } from '@/app/config';
 
 const mocks = vi.hoisted(() => {
     const authMiddleware = vi.fn(async (c: any, next: any) => {
-        c.set('user', { id: 'user-id-1', email: 'owner@example.com' });
+        c.set('user', { id: 'user-id-1', email: 'owner@example.com', username: 'owner-name' });
         await next();
     });
     const createShareForOwner = vi.fn();
@@ -171,6 +171,7 @@ describe('Share link routes', () => {
         expectOwnerMetadataAllowlist(body.share, true);
         expect(mocks.createShareForOwner).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1', 'owner-name'],
             vaultItemId: 'vault-1',
             ttlSeconds: 3600,
             expiresAt: undefined,
@@ -229,6 +230,7 @@ describe('Share link routes', () => {
         expect(body.result.successes[0].share.rawAccessCode).toBe('code-1');
         expect(mocks.createSharesForOwnerBatch).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1', 'owner-name'],
             vaultItemIds: ['vault-1', 'vault-2'],
             ttlSeconds: 3600,
             expiresAt: undefined,
@@ -322,6 +324,7 @@ describe('Share link routes', () => {
         });
         expect(mocks.createSharesForOwnerBatch).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1', 'owner-name'],
             vaultItemIds: ['vault-1', 'inaccessible-vault'],
             ttlSeconds: undefined,
             expiresAt: 4600,
@@ -377,6 +380,7 @@ describe('Share link routes', () => {
         expect(body.success).toBe(true);
         expect(mocks.createShareForOwner).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1', 'owner-name'],
             vaultItemId: 'vault-1',
             ttlSeconds: undefined,
             expiresAt: undefined,
@@ -411,6 +415,7 @@ describe('Share link routes', () => {
         expect(response.status).toBe(200);
         expect(mocks.createShareForOwner).toHaveBeenCalledWith({
             ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1', 'owner-name'],
             vaultItemId: 'vault-1',
             ttlSeconds: 3600,
             expiresAt: 4600,
@@ -445,7 +450,7 @@ describe('Share link routes', () => {
         expect(body).toEqual({ success: true, shares: [makeMetadataShare()] });
         expect(Object.keys(body).sort()).toEqual(['shares', 'success']);
         expectOwnerMetadataAllowlist(body.shares[0]);
-        expect(mocks.listSharesForOwner).toHaveBeenCalledWith('owner@example.com');
+        expect(mocks.listSharesForOwner).toHaveBeenCalledWith('owner@example.com', expect.any(Number), ['owner@example.com', 'user-id-1', 'owner-name']);
         expectOwnerResponseIsSafe(body);
     });
 
@@ -460,7 +465,7 @@ describe('Share link routes', () => {
         expect(body).toEqual({ success: true, share: makeMetadataShare() });
         expect(Object.keys(body).sort()).toEqual(['share', 'success']);
         expectOwnerMetadataAllowlist(body.share);
-        expect(mocks.getShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1');
+        expect(mocks.getShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1', expect.any(Number), ['owner@example.com', 'user-id-1', 'owner-name']);
         expectOwnerResponseIsSafe(body);
     });
 
@@ -481,7 +486,7 @@ describe('Share link routes', () => {
         });
         expect(Object.keys(body).sort()).toEqual(['message', 'share', 'success']);
         expectOwnerMetadataAllowlist(body.share);
-        expect(mocks.revokeShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1');
+        expect(mocks.revokeShareForOwner).toHaveBeenCalledWith('owner@example.com', 'share-1', expect.any(Number), ['owner@example.com', 'user-id-1', 'owner-name']);
         expectOwnerResponseIsSafe(body);
     });
 
@@ -496,7 +501,7 @@ describe('Share link routes', () => {
         const response = await app.request('https://nodeauth.test/api/share');
 
         expect(response.status).toBe(200);
-        expect(mocks.listSharesForOwner).toHaveBeenCalledWith('user-id-1');
+        expect(mocks.listSharesForOwner).toHaveBeenCalledWith('user-id-1', expect.any(Number), ['user-id-1']);
     });
 
     it('POST /api/share/public/:token/access accepts accessCode from the body only', async () => {

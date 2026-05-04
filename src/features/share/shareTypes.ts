@@ -79,6 +79,7 @@ export interface ShareAuditEvent {
 
 export interface CreateShareInput {
     ownerId: string;
+    ownerAliases?: string[];
     vaultItemId: string;
     expiresAt?: number;
     ttlSeconds?: number;

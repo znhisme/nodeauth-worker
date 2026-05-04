@@ -8,6 +8,12 @@ export class VaultRepository {
         this.db = dbClient;
     }
 
+    private getOwnerCandidates(ownerId: string, ownerAliases: string[] = []): string[] {
+        return Array.from(new Set([ownerId, ...ownerAliases]
+            .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+            .map((value) => value.trim())));
+    }
+
     /**
      * 获取所有的 vault items (仅查未删除)
      */
@@ -189,7 +195,11 @@ export class VaultRepository {
     /**
      * 获取 owner 可访问且未删除的单个 item
      */
-    async findActiveByIdForOwner(id: string, ownerId: string): Promise<VaultItem | null> {
+    async findActiveByIdForOwner(id: string, ownerId: string, ownerAliases: string[] = []): Promise<VaultItem | null> {
+        const ownerCandidates = this.getOwnerCandidates(ownerId, ownerAliases);
+        const ownerCondition = ownerCandidates.length > 1
+            ? inArray(vault.createdBy, ownerCandidates)
+            : eq(vault.createdBy, ownerId);
         const result = await this.db
             .select()
             .from(vault)
@@ -197,7 +207,7 @@ export class VaultRepository {
                 and(
                     eq(vault.id, id),
                     isNull(vault.deletedAt),
-                    or(isNull(vault.createdBy), eq(vault.createdBy, ownerId))
+                    or(isNull(vault.createdBy), ownerCondition)
                 )
             )
             .limit(1);

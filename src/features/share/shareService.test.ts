@@ -352,6 +352,7 @@ describe('ShareService', () => {
         expect(result.successes.map((row: any) => row.share.rawAccessCode)).toEqual(['code-1', 'code-2']);
         expect(serviceSpy).toHaveBeenNthCalledWith(1, {
             ownerId: 'owner-1',
+            ownerAliases: undefined,
             vaultItemId: 'vault-1',
             ttlSeconds: 3600,
             expiresAt: undefined,
@@ -360,6 +361,7 @@ describe('ShareService', () => {
         });
         expect(serviceSpy).toHaveBeenNthCalledWith(2, {
             ownerId: 'owner-1',
+            ownerAliases: undefined,
             vaultItemId: 'vault-2',
             ttlSeconds: 3600,
             expiresAt: undefined,
@@ -402,6 +404,7 @@ describe('ShareService', () => {
         expect(serviceSpy).toHaveBeenCalledTimes(3);
         expect(serviceSpy).toHaveBeenNthCalledWith(2, {
             ownerId: 'owner-1',
+            ownerAliases: undefined,
             vaultItemId: 'vault-inaccessible',
             ttlSeconds: undefined,
             expiresAt: 5000,
@@ -451,6 +454,41 @@ describe('ShareService', () => {
         }
     });
 
+    it('creates a share when the session owner is email but vault ownership is stored as user id alias', async () => {
+        const now = 3000;
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem({
+            createdBy: 'user-id-1',
+        }));
+        shareRepository.createReplacingShareLink.mockImplementation(async (input: any) => ({
+            replacedShares: [],
+            share: {
+                ...input,
+                id: 'share-1',
+            },
+        }));
+
+        const result = await service.createShareForOwner({
+            ownerId: 'owner@example.com',
+            ownerAliases: ['owner@example.com', 'user-id-1'],
+            vaultItemId: 'vault-1',
+            now,
+            expiresAt: 5000,
+            publicOrigin: 'https://shares.example',
+        });
+
+        expect(vaultRepository.findActiveByIdForOwner).toHaveBeenCalledWith('vault-1', 'owner@example.com', ['owner@example.com', 'user-id-1']);
+        expect(shareRepository.createReplacingShareLink).toHaveBeenCalledWith(expect.objectContaining({
+            ownerId: 'user-id-1',
+            vaultItemId: 'vault-1',
+        }));
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'created',
+            ownerId: 'user-id-1',
+        }));
+        expect(result.publicUrl).toContain('/share/');
+        expect(result.rawAccessCode).toBeTruthy();
+    });
+
     it('serializes owner metadata without forbidden secret fields and with descending status coverage', async () => {
         shareRepository.listForOwner.mockResolvedValue([
             makeShareRecord({
@@ -486,7 +524,7 @@ describe('ShareService', () => {
 
         const views = await service.listSharesForOwner('owner-1', 1000);
 
-        expect(shareRepository.listForOwner).toHaveBeenCalledWith('owner-1');
+        expect(shareRepository.listForOwner).toHaveBeenCalledWith('owner-1', []);
         expect(views.map((view: any) => view.status)).toEqual(['active', 'expired', 'revoked']);
         expect(JSON.stringify(views)).not.toContain('tokenHash');
         expect(JSON.stringify(views)).not.toContain('accessCodeHash');
@@ -527,7 +565,7 @@ describe('ShareService', () => {
         const detail = await service.getShareForOwner('owner-1', 'share-1', 1000);
         const revoked = await service.revokeShareForOwner('owner-1', 'share-1', 1000);
 
-        expect(shareRepository.findByIdForOwner).toHaveBeenCalledWith('share-1', 'owner-1');
+        expect(shareRepository.findByIdForOwner).toHaveBeenCalledWith('share-1', 'owner-1', []);
         expect(JSON.stringify(detail)).not.toContain('tokenHash');
         expect(JSON.stringify(detail)).not.toContain('accessCodeHash');
         expect(JSON.stringify(detail)).not.toContain('rawToken');

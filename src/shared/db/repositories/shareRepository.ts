@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, count, desc, eq, gt, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import {
     shareAuditEvents,
     shareLinks,
@@ -15,6 +15,19 @@ const ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS = 3;
 
 function createActiveShareKey(ownerId: string, vaultItemId: string): string {
     return `${ownerId}:${vaultItemId}`;
+}
+
+function getOwnerCandidates(ownerId: string, ownerAliases: string[] = []): string[] {
+    return Array.from(new Set([ownerId, ...ownerAliases]
+        .filter((value): value is string => typeof value === 'string' && value.trim() !== '')
+        .map((value) => value.trim())));
+}
+
+function createOwnerCondition(ownerColumn: any, ownerId: string, ownerAliases: string[] = []) {
+    const ownerCandidates = getOwnerCandidates(ownerId, ownerAliases);
+    return ownerCandidates.length > 1
+        ? inArray(ownerColumn, ownerCandidates)
+        : eq(ownerColumn, ownerId);
 }
 
 function isUniqueConflict(error: unknown): boolean {
@@ -47,25 +60,25 @@ export class ShareRepository {
         return result[0] || null;
     }
 
-    async findByIdForOwner(id: string, ownerId: string): Promise<ShareLink | null> {
+    async findByIdForOwner(id: string, ownerId: string, ownerAliases: string[] = []): Promise<ShareLink | null> {
         const result = await this.db
             .select()
             .from(shareLinks)
-            .where(and(eq(shareLinks.id, id), eq(shareLinks.ownerId, ownerId)))
+            .where(and(eq(shareLinks.id, id), createOwnerCondition(shareLinks.ownerId, ownerId, ownerAliases)))
             .limit(1);
         return result[0] || null;
     }
 
-    async listForOwner(ownerId: string): Promise<ShareLink[]> {
+    async listForOwner(ownerId: string, ownerAliases: string[] = []): Promise<ShareLink[]> {
         return await this.db
             .select()
             .from(shareLinks)
-            .where(eq(shareLinks.ownerId, ownerId))
+            .where(createOwnerCondition(shareLinks.ownerId, ownerId, ownerAliases))
             .orderBy(desc(shareLinks.createdAt));
     }
 
-    async revokeForOwner(id: string, ownerId: string, revokedAt: number): Promise<boolean> {
-        const existing = await this.findByIdForOwner(id, ownerId);
+    async revokeForOwner(id: string, ownerId: string, revokedAt: number, ownerAliases: string[] = []): Promise<boolean> {
+        const existing = await this.findByIdForOwner(id, ownerId, ownerAliases);
         if (!existing || (existing.revokedAt !== null && existing.revokedAt !== undefined)) {
             return false;
         }
@@ -73,7 +86,7 @@ export class ShareRepository {
         await this.db
             .update(shareLinks)
             .set({ revokedAt })
-            .where(and(eq(shareLinks.id, id), eq(shareLinks.ownerId, ownerId), isNull(shareLinks.revokedAt)));
+            .where(and(eq(shareLinks.id, id), createOwnerCondition(shareLinks.ownerId, ownerId, ownerAliases), isNull(shareLinks.revokedAt)));
 
         return true;
     }

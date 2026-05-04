@@ -46,6 +46,8 @@
             revokeWarning: zh ? '撤销只能阻止未来访问，不能收回已经查看或复制的凭据。' : 'Revocation blocks future access, but cannot retract credentials already viewed or copied.',
             offline: zh ? 'Sharing requires a network connection. Reconnect and try again.' : 'Sharing requires a network connection. Reconnect and try again.',
             batchConfirm: zh ? 'Creating new links will replace any current active links for selected accounts. Old links will stop working.' : 'Creating new links will replace any current active links for selected accounts. Old links will stop working.',
+            shareConfirmTitle: zh ? '分享' : 'Share',
+            shareConfirmButton: zh ? '分享' : 'Share',
             oneTimeTitle: zh ? '批量分享结果' : 'Batch Share Results',
             oneTimeText: zh ? 'Copy each link and access code now. Access codes are shown only once.' : 'Copy each link and access code now. Access codes are shown only once.',
             copy: zh ? '复制' : 'Copy',
@@ -246,6 +248,37 @@
         const event = new CustomEvent('na-share-ui-message', { detail: { message, type } });
         window.dispatchEvent(event);
         if (type === 'error') console.error(`[share-ui] ${message}`);
+    }
+
+    function getElementPlusConfirm() {
+        const appGlobals = document.querySelector('#app')?.__vue_app__?.config?.globalProperties;
+        const candidates = [
+            window.ElMessageBox?.confirm,
+            window.ElementPlus?.ElMessageBox?.confirm,
+            appGlobals?.$confirm,
+            appGlobals?.$messageBox?.confirm,
+            appGlobals?.$msgbox?.confirm,
+        ];
+        return candidates.find((candidate) => typeof candidate === 'function') || null;
+    }
+
+    async function confirmShareCreation() {
+        const confirm = getElementPlusConfirm();
+        if (!confirm) return window.confirm(t('batchConfirm'));
+
+        try {
+            await confirm(t('batchConfirm'), t('shareConfirmTitle'), {
+                type: 'warning',
+                confirmButtonText: t('shareConfirmButton'),
+                cancelButtonText: t('cancel'),
+            });
+            return true;
+        } catch (error) {
+            if (error !== 'cancel' && error !== 'close') {
+                console.error('[share-ui] share confirmation failed', error);
+            }
+            return false;
+        }
     }
 
     function injectNav() {
@@ -473,7 +506,7 @@
             notify(t('offline'), 'error');
             return;
         }
-        if (!window.confirm(t('batchConfirm'))) return;
+        if (!await confirmShareCreation()) return;
 
         STATE.batchBusy = true;
         injectBatchButton();
