@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: complete
 stopped_at: Phase 04 UAT gap closed with share management UI overlay and batch share entry
-last_updated: "2026-05-04T05:40:00.000Z"
-last_activity: 2026-05-04 -- Phase 04 UAT gap closed by plan 04-04
+last_updated: "2026-05-04T10:22:00.000Z"
+last_activity: 2026-05-04 -- Completed quick task 260504-pdg: 根据已有的测试流程导入两个 OpenAI otpauth TOTP 条目
 progress:
   total_phases: 4
   completed_phases: 4
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 Phase: 04 (ui-1-2) — VERIFIED AFTER UAT GAP CLOSURE
 Plan: 4 of 4
 Status: Phase 04 UAT gap closed; share management UI and batch share entry now render from editable frontend source
-Last activity: 2026-05-04 -- Phase 04 UAT gap closed by plan 04-04
+Last activity: 2026-05-04 -- Completed quick task 260504-pdg: 根据已有的测试流程导入两个 OpenAI otpauth TOTP 条目
 
 Progress: [██████████] 100%
 
@@ -131,6 +131,7 @@ None yet.
 | 260504-h9f | fix Phase 04 latest-share-wins concurrency security gap | 2026-05-04 | 46f45c1 | [260504-h9f-fix-phase-04-latest-share-wins-concurren](./quick/260504-h9f-fix-phase-04-latest-share-wins-concurren/) |
 | 260504-5fy | commit and push share management UI fix and ignore local runtime files | 2026-05-03 | 2e3cf64 | [260504-5fy-commit-and-push-share-management-ui-fix-](./quick/260504-5fy-commit-and-push-share-management-ui-fix-/) |
 | 260504-ne8 | deploy local Docker with GitHub OAuth config | 2026-05-04 | 73ba696 | [260504-ne8-docker-nodeauth-github-oauth](./quick/260504-ne8-docker-nodeauth-github-oauth/) |
+| 260504-pdg | 根据已有的测试流程导入两个 OpenAI otpauth TOTP 条目 | 2026-05-04 | runtime-data | [260504-pdg-openai-otpauth-totp](./quick/260504-pdg-openai-otpauth-totp/) |
 
 ## Deferred Items
 
