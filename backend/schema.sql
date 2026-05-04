@@ -114,7 +114,6 @@ CREATE INDEX IF NOT EXISTS idx_share_links_vault_item ON share_links(vault_item_
 CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
 CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
 CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
 CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
 
