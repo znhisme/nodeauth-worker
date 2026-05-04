@@ -5,17 +5,25 @@ import { verifySecureJWT } from '@/shared/utils/crypto';
 import { SessionService } from '@/features/auth/sessionService';
 
 export async function authMiddleware(c: Context<{ Bindings: EnvBindings, Variables: { user: any, sessionId: string } }>, next: Next) {
-    // 1. 从 Cookie 获取 JWT
-    const token = getCookie(c, 'auth_token');
-    if (!token) {
-        throw new AppError('no_session', 401);
-    }
+    // 1. 从 Cookie 或手动 Authorization Bearer 头获取 JWT
+    const cookieToken = getCookie(c, 'auth_token');
+    let token = cookieToken;
 
-    // 2. CSRF 校验 (Double Submit Cookie)
-    const csrfCookie = getCookie(c, 'csrf_token');
-    const csrfHeader = c.req.header('X-CSRF-Token');
-    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
-        throw new AppError('csrf_mismatch', 403);
+    if (cookieToken) {
+        // 2. Cookie 模式必须保留 CSRF 校验 (Double Submit Cookie)
+        const csrfCookie = getCookie(c, 'csrf_token');
+        const csrfHeader = c.req.header('X-CSRF-Token');
+        if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+            throw new AppError('csrf_mismatch', 403);
+        }
+    } else {
+        const authorization = c.req.header('Authorization');
+        const bearerMatch = authorization?.match(/^Bearer\s+(.+)$/i);
+        token = bearerMatch?.[1]?.trim();
+
+        if (!token) {
+            throw new AppError('no_session', 401);
+        }
     }
 
     // 3. 验证 JWT
