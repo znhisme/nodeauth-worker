@@ -1,0 +1,9 @@
+{
+    "name": "nodeauth-frontend-overlay",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build:share-ui": "node scripts/build-share-ui.js"
+    }
+}
+
