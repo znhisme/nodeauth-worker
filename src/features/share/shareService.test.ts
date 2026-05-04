@@ -489,6 +489,38 @@ describe('ShareService', () => {
         expect(result.rawAccessCode).toBeTruthy();
     });
 
+    it('does not fail share creation when the request origin cannot be used for a public URL', async () => {
+        const now = 3000;
+        vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
+        shareRepository.createReplacingShareLink.mockImplementation(async (input: any) => ({
+            replacedShares: [],
+            share: {
+                ...input,
+                id: 'share-1',
+            },
+        }));
+
+        const result = await service.createShareForOwner({
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            now,
+            expiresAt: 5000,
+            publicOrigin: 'http://nodeauth.example',
+        });
+
+        expect(result.publicUrl).toBeUndefined();
+        expect(result.rawToken).toBeTruthy();
+        expect(result.rawAccessCode).toBeTruthy();
+        expect(shareRepository.createReplacingShareLink).toHaveBeenCalledWith(expect.objectContaining({
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+        }));
+        expect(shareRepository.insertAuditEvent).toHaveBeenCalledWith(expect.objectContaining({
+            eventType: 'created',
+            shareId: 'share-1',
+        }));
+    });
+
     it('serializes owner metadata without forbidden secret fields and with descending status coverage', async () => {
         shareRepository.listForOwner.mockResolvedValue([
             makeShareRecord({

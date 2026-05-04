@@ -2,12 +2,26 @@ import { Hono } from 'hono';
 import { EnvBindings } from '@/app/config';
 import { authMiddleware } from '@/shared/middleware/auth';
 import { createShareService } from '@/features/share/shareService';
-import { getSharePublicHeaders } from '@/features/share/shareSecurity';
+import { getSharePublicHeaders, normalizePublicOrigin } from '@/features/share/shareSecurity';
 import { shareRateLimit } from '@/shared/middleware/shareRateLimitMiddleware';
+import { logger } from '@/shared/utils/logger';
 
 const share = new Hono<{ Bindings: EnvBindings, Variables: { user: any } }>();
 
 const getService = (c: any) => createShareService(c.env);
+
+const getPublicOrigin = (c: any): string => {
+    const configuredOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN;
+    if (typeof configuredOrigin === 'string' && configuredOrigin.trim() !== '') {
+        try {
+            return normalizePublicOrigin(configuredOrigin);
+        } catch (error) {
+            logger.warn(`[Share] Ignoring invalid NODEAUTH_PUBLIC_ORIGIN: ${(error as Error).message}`);
+        }
+    }
+
+    return new URL(c.req.url).origin;
+};
 
 const getOwnerIdentity = (c: any): { ownerId: string; ownerAliases: string[] } => {
     const user = c.get('user') || {};
@@ -27,7 +41,7 @@ share.post('/', authMiddleware, async (c) => {
         return c.json({ success: false, error: 'vaultItemId is required' }, 400);
     }
 
-    const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+    const publicOrigin = getPublicOrigin(c);
     const service = getService(c);
     const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : undefined;
     const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;
@@ -63,7 +77,7 @@ share.post('/batch', authMiddleware, async (c) => {
         return c.json({ success: false, error: 'vaultItemIds cannot exceed 50' }, 400);
     }
 
-    const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+    const publicOrigin = getPublicOrigin(c);
     const service = getService(c);
     const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : undefined;
     const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : undefined;

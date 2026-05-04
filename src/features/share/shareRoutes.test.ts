@@ -423,6 +423,66 @@ describe('Share link routes', () => {
         });
     });
 
+    it('POST /api/share falls back to the request origin when NODEAUTH_PUBLIC_ORIGIN is invalid', async () => {
+        mocks.createShareForOwner.mockResolvedValue({
+            ...makeMetadataShare({ publicUrl: 'https://nodeauth.test/share/raw-token-123' }),
+            rawToken: 'raw-token-123',
+            rawAccessCode: 'code-123',
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share', {
+            method: 'POST',
+            body: JSON.stringify({ vaultItemId: 'vault-1' }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, {
+            NODEAUTH_PUBLIC_ORIGIN: 'http://nodeauth.example',
+        } as any);
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.share.publicUrl).toBe('https://nodeauth.test/share/raw-token-123');
+        expect(mocks.createShareForOwner).toHaveBeenCalledWith(expect.objectContaining({
+            publicOrigin: 'https://nodeauth.test',
+        }));
+    });
+
+    it('POST /api/share/batch falls back to the request origin when NODEAUTH_PUBLIC_ORIGIN is invalid', async () => {
+        mocks.createSharesForOwnerBatch.mockResolvedValue({
+            successes: [
+                {
+                    requestIndex: 0,
+                    share: {
+                        ...makeMetadataShare({ publicUrl: 'https://nodeauth.test/share/raw-token-1' }),
+                        rawToken: 'raw-token-1',
+                        rawAccessCode: 'code-1',
+                    },
+                },
+            ],
+            failures: [],
+        });
+
+        const app = makeApp();
+        const response = await app.request('https://nodeauth.test/api/share/batch', {
+            method: 'POST',
+            body: JSON.stringify({ vaultItemIds: ['vault-1'] }),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }, {
+            NODEAUTH_PUBLIC_ORIGIN: 'http://nodeauth.example',
+        } as any);
+        const body = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(body.result.successes[0].share.publicUrl).toBe('https://nodeauth.test/share/raw-token-1');
+        expect(mocks.createSharesForOwnerBatch).toHaveBeenCalledWith(expect.objectContaining({
+            publicOrigin: 'https://nodeauth.test',
+        }));
+    });
+
     it('POST /api/share rejects missing vaultItemId', async () => {
         const app = makeApp();
         const response = await app.request('https://nodeauth.test/api/share', {

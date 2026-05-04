@@ -7333,6 +7333,7 @@ var ShareRepository = class {
 
 // ../src/features/share/shareService.ts
 init_otp();
+init_logger();
 
 // ../src/features/share/shareSecurity.ts
 init_config();
@@ -7458,6 +7459,17 @@ function resolveEffectiveOwnerId(ownerId, ownerAliases, vaultItem) {
   const createdBy = typeof vaultItem.createdBy === "string" ? vaultItem.createdBy.trim() : "";
   return createdBy && getOwnerCandidates2(ownerId, ownerAliases).includes(createdBy) ? createdBy : ownerId;
 }
+function buildOptionalShareUrl(publicOrigin, rawToken) {
+  if (!publicOrigin) {
+    return void 0;
+  }
+  try {
+    return buildShareUrl(publicOrigin, rawToken);
+  } catch (error) {
+    logger.warn(`[Share] Could not build public share URL: ${error.message}`);
+    return void 0;
+  }
+}
 var ShareService = class {
   constructor(env, vaultRepository, shareRepository) {
     this.env = env;
@@ -7531,7 +7543,7 @@ var ShareService = class {
       });
     }
     const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
-    const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : void 0;
+    const publicUrl = buildOptionalShareUrl(publicOrigin, rawToken);
     await this.shareRepository.insertAuditEvent({
       id: createId("share-audit"),
       shareId: share2.id,
@@ -7860,8 +7872,20 @@ var shareRateLimit = (options) => {
 };
 
 // ../src/features/share/shareRoutes.ts
+init_logger();
 var share = new Hono6();
 var getService3 = (c) => createShareService(c.env);
+var getPublicOrigin = (c) => {
+  const configuredOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN;
+  if (typeof configuredOrigin === "string" && configuredOrigin.trim() !== "") {
+    try {
+      return normalizePublicOrigin(configuredOrigin);
+    } catch (error) {
+      logger.warn(`[Share] Ignoring invalid NODEAUTH_PUBLIC_ORIGIN: ${error.message}`);
+    }
+  }
+  return new URL(c.req.url).origin;
+};
 var getOwnerIdentity = (c) => {
   const user = c.get("user") || {};
   const ownerId = user.email || user.id;
@@ -7874,7 +7898,7 @@ share.post("/", authMiddleware, async (c) => {
   if (typeof body.vaultItemId !== "string" || body.vaultItemId.trim() === "") {
     return c.json({ success: false, error: "vaultItemId is required" }, 400);
   }
-  const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+  const publicOrigin = getPublicOrigin(c);
   const service = getService3(c);
   const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : void 0;
   const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : void 0;
@@ -7903,7 +7927,7 @@ share.post("/batch", authMiddleware, async (c) => {
   if (body.vaultItemIds.length > 50) {
     return c.json({ success: false, error: "vaultItemIds cannot exceed 50" }, 400);
   }
-  const publicOrigin = c.env?.NODEAUTH_PUBLIC_ORIGIN || new URL(c.req.url).origin;
+  const publicOrigin = getPublicOrigin(c);
   const service = getService3(c);
   const ttlSeconds = Number.isFinite(body.ttlSeconds) ? body.ttlSeconds : void 0;
   const expiresAt = Number.isFinite(body.expiresAt) ? body.expiresAt : void 0;

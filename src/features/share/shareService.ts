@@ -3,6 +3,7 @@ import { decryptField } from '@/shared/db/db';
 import { VaultRepository } from '@/shared/db/repositories/vaultRepository';
 import { ShareRepository } from '@/shared/db/repositories/shareRepository';
 import { generate } from '@/shared/utils/otp';
+import { logger } from '@/shared/utils/logger';
 import {
     buildShareUrl,
     clampShareTtlSeconds,
@@ -54,6 +55,19 @@ function resolveEffectiveOwnerId(ownerId: string, ownerAliases: string[] | undef
     return createdBy && getOwnerCandidates(ownerId, ownerAliases).includes(createdBy)
         ? createdBy
         : ownerId;
+}
+
+function buildOptionalShareUrl(publicOrigin: string | undefined, rawToken: string): string | undefined {
+    if (!publicOrigin) {
+        return undefined;
+    }
+
+    try {
+        return buildShareUrl(publicOrigin, rawToken);
+    } catch (error) {
+        logger.warn(`[Share] Could not build public share URL: ${(error as Error).message}`);
+        return undefined;
+    }
 }
 
 export class ShareService {
@@ -138,7 +152,7 @@ export class ShareService {
         }
 
         const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
-        const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : undefined;
+        const publicUrl = buildOptionalShareUrl(publicOrigin, rawToken);
 
         await this.shareRepository.insertAuditEvent({
             id: createId('share-audit'),
