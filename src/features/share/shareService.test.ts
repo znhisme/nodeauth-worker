@@ -124,6 +124,7 @@ describe('ShareService', () => {
         };
         shareRepository = {
             createShareLink: vi.fn(),
+            createReplacingShareLink: vi.fn(),
             findByTokenHash: vi.fn(),
             findByIdForOwner: vi.fn(),
             listForOwner: vi.fn(),
@@ -176,7 +177,9 @@ describe('ShareService', () => {
 
     it('stores only hashed share secrets', async () => {
         vaultRepository.findActiveByIdForOwner.mockResolvedValue(makeVaultItem());
-        shareRepository.createShareLink.mockResolvedValue({
+        shareRepository.createReplacingShareLink.mockResolvedValue({
+            replacedShares: [],
+            share: {
             id: 'share-1',
             vaultItemId: 'vault-1',
             ownerId: 'owner-1',
@@ -187,6 +190,7 @@ describe('ShareService', () => {
             createdAt: 1000,
             lastAccessedAt: null,
             accessCount: 0,
+            },
         });
 
         const result = await service.createShare({
@@ -198,7 +202,7 @@ describe('ShareService', () => {
 
         expect(result.rawToken).toBeTruthy();
         expect(result.rawAccessCode).toBeTruthy();
-        const createInput = shareRepository.createShareLink.mock.calls[0][0];
+        const createInput = shareRepository.createReplacingShareLink.mock.calls[0][0];
         expect(createInput.tokenHash).not.toBe(result.rawToken);
         expect(createInput.accessCodeHash).not.toBe(result.rawAccessCode);
         expect(createInput.tokenHash).toMatch(/^[A-Za-z0-9_-]+$/);
@@ -222,18 +226,20 @@ describe('ShareService', () => {
             id: 'vault-1',
             secret: 'vault-secret-seed',
         }));
-        shareRepository.revokeActiveForOwnerVaultItem.mockResolvedValue([oldShare]);
-        shareRepository.createShareLink.mockResolvedValue({
-            id: 'share-new',
-            vaultItemId: 'vault-1',
-            ownerId: 'owner-1',
-            tokenHash: 'new-token-hash',
-            accessCodeHash: 'new-access-code-hash',
-            expiresAt: 5000,
-            revokedAt: null,
-            createdAt: now,
-            lastAccessedAt: null,
-            accessCount: 0,
+        shareRepository.createReplacingShareLink.mockResolvedValue({
+            replacedShares: [oldShare],
+            share: {
+                id: 'share-new',
+                vaultItemId: 'vault-1',
+                ownerId: 'owner-1',
+                tokenHash: 'new-token-hash',
+                accessCodeHash: 'new-access-code-hash',
+                expiresAt: 5000,
+                revokedAt: null,
+                createdAt: now,
+                lastAccessedAt: null,
+                accessCount: 0,
+            },
         });
 
         const result = await service.createShare({
@@ -244,12 +250,15 @@ describe('ShareService', () => {
             publicOrigin: 'https://share.example.test',
         } as any);
 
-        expect(shareRepository.revokeActiveForOwnerVaultItem)
-            .toHaveBeenCalledWith('owner-1', 'vault-1', now);
-        expect(shareRepository.revokeActiveForOwnerVaultItem.mock.invocationCallOrder[0])
+        expect(shareRepository.createReplacingShareLink)
+            .toHaveBeenCalledWith(expect.objectContaining({
+                ownerId: 'owner-1',
+                vaultItemId: 'vault-1',
+                expiresAt: 5000,
+                createdAt: now,
+            }));
+        expect(shareRepository.createReplacingShareLink.mock.invocationCallOrder[0])
             .toBeGreaterThan(vaultRepository.findActiveByIdForOwner.mock.invocationCallOrder[0]);
-        expect(shareRepository.revokeActiveForOwnerVaultItem.mock.invocationCallOrder[0])
-            .toBeLessThan(shareRepository.createShareLink.mock.invocationCallOrder[0]);
         expect(result.rawToken).toBeTruthy();
         expect(result.rawAccessCode).toBeTruthy();
 

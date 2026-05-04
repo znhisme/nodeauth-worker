@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Foundation and Security Primitives** - Maintainer has editable sources, reproducible builds, a share-link security contract, and durable secure share state.
 - [x] **Phase 2: Share Link API** - Owners can create/manage one-item share links and friends can access the shared account through token plus access code.
 - [x] **Phase 3: Cleanup, Compatibility, and Hardening** - Expired share state is maintained, UX semantics are clear, and security/runtime regressions are covered.
-- [ ] **Phase 4: 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享** - UI share management and batch sharing workflow are planned next.
+- [x] **Phase 4: 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享** - UI share management and batch sharing workflow backend/source gate is complete.
 
 ## Phase Details
 
@@ -108,7 +108,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4
 | 1. Foundation and Security Primitives | 7/7 | Complete | 2026-05-02 |
 | 2. Share Link API | 6/6 | Complete | 2026-05-02 |
 | 3. Cleanup, Compatibility, and Hardening | 11/11 | Complete | 2026-05-03 |
-| 4. 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享 | 0/3 | Planned | - |
+| 4. 新增UI功能改动，左侧菜单界面新增管理分享页面，点击后可以管理有分享的账户，每个账户只能有一条有效分享。以最新的为准，点击分享账户获取新链接后，旧的自动过期，同时把1，2讨论的功能全部实现到该页面上，并在我的账户界面，支持全选，分组全选的时候在删除按钮和取消按钮中间新增一个分享按钮，支持批量分享 | 3/3 | Complete | 2026-05-04 |
 
 ## Requirement Coverage
 

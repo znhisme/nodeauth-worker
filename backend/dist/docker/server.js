@@ -927,6 +927,7 @@ var shareLinks = sqliteTable("share_links", {
   ownerId: text("owner_id").notNull(),
   tokenHash: text("token_hash").notNull(),
   accessCodeHash: text("access_code_hash").notNull(),
+  activeShareKey: text("active_share_key"),
   expiresAt: integer("expires_at").notNull(),
   revokedAt: integer("revoked_at"),
   createdAt: integer("created_at").notNull(),
@@ -1071,6 +1072,7 @@ var shareLinks2 = mysqlTable("share_links", {
   ownerId: varchar("owner_id", { length: 255 }).notNull(),
   tokenHash: varchar("token_hash", { length: 255 }).notNull(),
   accessCodeHash: varchar("access_code_hash", { length: 255 }).notNull(),
+  activeShareKey: varchar("active_share_key", { length: 320 }),
   expiresAt: bigint("expires_at", { mode: "number" }).notNull(),
   revokedAt: bigint("revoked_at", { mode: "number" }),
   createdAt: bigint("created_at", { mode: "number" }).notNull(),
@@ -1198,6 +1200,7 @@ var shareLinks3 = pgTable("share_links", {
   ownerId: varchar2("owner_id").notNull(),
   tokenHash: varchar2("token_hash").notNull(),
   accessCodeHash: varchar2("access_code_hash").notNull(),
+  activeShareKey: varchar2("active_share_key"),
   expiresAt: bigint2("expires_at", { mode: "number" }).notNull(),
   revokedAt: bigint2("revoked_at", { mode: "number" }),
   createdAt: bigint2("created_at", { mode: "number" }).notNull(),
@@ -7197,6 +7200,16 @@ init_config();
 
 // ../src/shared/db/repositories/shareRepository.ts
 import { and as and5, count, desc as desc7, eq as eq10, gt, isNull as isNull2, lt as lt2, lte, sql as sql2 } from "drizzle-orm";
+var ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS = 3;
+function createActiveShareKey(ownerId, vaultItemId) {
+  return `${ownerId}:${vaultItemId}`;
+}
+function isUniqueConflict(error) {
+  const err = error;
+  const msg = err.message?.toLowerCase() || "";
+  const code = String(err.code || "").toLowerCase();
+  return msg.includes("unique") || msg.includes("duplicate") || code === "er_dup_entry" || code === "23505" || code === "2067";
+}
 var ShareRepository = class {
   constructor(db2) {
     this.db = db2;
@@ -7224,6 +7237,28 @@ var ShareRepository = class {
     await this.db.update(shareLinks4).set({ revokedAt }).where(and5(eq10(shareLinks4.id, id), eq10(shareLinks4.ownerId, ownerId), isNull2(shareLinks4.revokedAt)));
     return true;
   }
+  async createReplacingShareLink(input) {
+    const revokedAt = Number(input.createdAt);
+    const activeShareKey = createActiveShareKey(input.ownerId, input.vaultItemId);
+    const replacedSharesById = /* @__PURE__ */ new Map();
+    for (let attempt = 0; attempt < ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS; attempt += 1) {
+      for (const share2 of await this.revokeActiveForOwnerVaultItem(input.ownerId, input.vaultItemId, revokedAt)) {
+        replacedSharesById.set(share2.id, share2);
+      }
+      try {
+        const share2 = await this.createShareLink({
+          ...input,
+          activeShareKey
+        });
+        return { share: share2, replacedShares: Array.from(replacedSharesById.values()) };
+      } catch (error) {
+        if (!isUniqueConflict(error) || attempt === ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS - 1) {
+          throw error;
+        }
+      }
+    }
+    throw new Error("share_replace_conflict");
+  }
   async revokeActiveForOwnerVaultItem(ownerId, vaultItemId, revokedAt) {
     const activeShares = await this.db.select().from(shareLinks4).where(and5(
       eq10(shareLinks4.ownerId, ownerId),
@@ -7231,14 +7266,10 @@ var ShareRepository = class {
       isNull2(shareLinks4.revokedAt),
       gt(shareLinks4.expiresAt, revokedAt)
     ));
-    if (activeShares.length === 0) {
-      return [];
-    }
-    await this.db.update(shareLinks4).set({ revokedAt }).where(and5(
+    await this.db.update(shareLinks4).set({ revokedAt, activeShareKey: null }).where(and5(
       eq10(shareLinks4.ownerId, ownerId),
       eq10(shareLinks4.vaultItemId, vaultItemId),
-      isNull2(shareLinks4.revokedAt),
-      gt(shareLinks4.expiresAt, revokedAt)
+      isNull2(shareLinks4.revokedAt)
     ));
     return activeShares;
   }
@@ -7475,7 +7506,24 @@ var ShareService = class {
     if (!vaultItem) {
       throw new AppError("share_item_inaccessible", 404);
     }
-    const replacedShares = await this.shareRepository.revokeActiveForOwnerVaultItem(input.ownerId, input.vaultItemId, now);
+    const rawToken = generateShareToken();
+    const rawAccessCode = generateAccessCode();
+    const pepper = getShareSecretPepper(this.env);
+    const tokenHash = await hashShareSecret(pepper, "share-token", rawToken);
+    const accessCodeHash = await hashShareSecret(pepper, "share-access-code", rawAccessCode);
+    const shareId = createId("share");
+    const { share: share2, replacedShares } = await this.shareRepository.createReplacingShareLink({
+      id: shareId,
+      vaultItemId: input.vaultItemId,
+      ownerId: input.ownerId,
+      tokenHash,
+      accessCodeHash,
+      expiresAt,
+      revokedAt: null,
+      createdAt: now,
+      lastAccessedAt: null,
+      accessCount: 0
+    });
     for (const replacedShare of replacedShares) {
       await this.shareRepository.insertAuditEvent({
         id: createId("share-audit"),
@@ -7492,24 +7540,6 @@ var ShareService = class {
         })
       });
     }
-    const rawToken = generateShareToken();
-    const rawAccessCode = generateAccessCode();
-    const pepper = getShareSecretPepper(this.env);
-    const tokenHash = await hashShareSecret(pepper, "share-token", rawToken);
-    const accessCodeHash = await hashShareSecret(pepper, "share-access-code", rawAccessCode);
-    const shareId = createId("share");
-    const share2 = await this.shareRepository.createShareLink({
-      id: shareId,
-      vaultItemId: input.vaultItemId,
-      ownerId: input.ownerId,
-      tokenHash,
-      accessCodeHash,
-      expiresAt,
-      revokedAt: null,
-      createdAt: now,
-      lastAccessedAt: null,
-      accessCount: 0
-    });
     const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
     const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : void 0;
     await this.shareRepository.insertAuditEvent({
@@ -8857,6 +8887,7 @@ var BASE_SCHEMA = [
         owner_id TEXT NOT NULL,
         token_hash TEXT NOT NULL,
         access_code_hash TEXT NOT NULL,
+        active_share_key TEXT,
         expires_at INTEGER NOT NULL,
         revoked_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -8901,6 +8932,7 @@ var MYSQL_SHARE_BASE_SCHEMA = [
         owner_id VARCHAR(255) NOT NULL,
         token_hash VARCHAR(255) NOT NULL,
         access_code_hash VARCHAR(255) NOT NULL,
+        active_share_key VARCHAR(320),
         expires_at BIGINT NOT NULL,
         revoked_at BIGINT,
         created_at BIGINT NOT NULL,
@@ -9087,6 +9119,7 @@ var MIGRATIONS = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at INTEGER NOT NULL,
                 revoked_at INTEGER,
                 created_at INTEGER NOT NULL,
@@ -9116,6 +9149,7 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9126,6 +9160,7 @@ var MIGRATIONS = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at INTEGER NOT NULL,
                 revoked_at INTEGER,
                 created_at INTEGER NOT NULL,
@@ -9155,6 +9190,7 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9165,6 +9201,7 @@ var MIGRATIONS = [
                 owner_id VARCHAR(255) NOT NULL,
                 token_hash VARCHAR(255) NOT NULL,
                 access_code_hash VARCHAR(255) NOT NULL,
+                active_share_key VARCHAR(320),
                 expires_at BIGINT NOT NULL,
                 revoked_at BIGINT,
                 created_at BIGINT NOT NULL,
@@ -9194,6 +9231,7 @@ var MIGRATIONS = [
             CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -9204,6 +9242,7 @@ var MIGRATIONS = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at BIGINT NOT NULL,
                 revoked_at BIGINT,
                 created_at BIGINT NOT NULL,
@@ -9233,8 +9272,133 @@ var MIGRATIONS = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `
+  },
+  {
+    version: 14,
+    name: "add_active_share_uniqueness_guard",
+    sqlite: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        )
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+    d1: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        )
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+    mysql: `
+            ALTER TABLE share_links ADD COLUMN active_share_key VARCHAR(320);
+            UPDATE share_links
+                SET revoked_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        ) AS retained_active_shares
+                    );
+            UPDATE share_links
+                SET active_share_key = CONCAT(owner_id, ':', vault_item_id)
+                WHERE revoked_at IS NULL
+                    AND expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000;
+            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+    postgres: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = EXTRACT(EPOCH FROM NOW()) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        ) AS retained_active_shares
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > EXTRACT(EPOCH FROM NOW()) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
         `
   }
 ];

@@ -25,6 +25,7 @@ export const shareLinks = pgTable('share_links', {
     ownerId: varchar('owner_id').notNull(),
     tokenHash: varchar('token_hash').notNull(),
     accessCodeHash: varchar('access_code_hash').notNull(),
+    activeShareKey: varchar('active_share_key'),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
     revokedAt: bigint('revoked_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),

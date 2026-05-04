@@ -25,6 +25,7 @@ export const shareLinks = mysqlTable('share_links', {
     ownerId: varchar('owner_id', { length: 255 }).notNull(),
     tokenHash: varchar('token_hash', { length: 255 }).notNull(),
     accessCodeHash: varchar('access_code_hash', { length: 255 }).notNull(),
+    activeShareKey: varchar('active_share_key', { length: 320 }),
     expiresAt: bigint('expires_at', { mode: 'number' }).notNull(),
     revokedAt: bigint('revoked_at', { mode: 'number' }),
     createdAt: bigint('created_at', { mode: 'number' }).notNull(),

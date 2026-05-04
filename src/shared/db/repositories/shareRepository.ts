@@ -11,6 +11,25 @@ import {
 } from '@/shared/db/schema/index';
 import { type ShareRateLimitDecision, type ShareRateLimitInput } from '@/features/share/shareTypes';
 
+const ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS = 3;
+
+function createActiveShareKey(ownerId: string, vaultItemId: string): string {
+    return `${ownerId}:${vaultItemId}`;
+}
+
+function isUniqueConflict(error: unknown): boolean {
+    const err = error as { message?: string; code?: string };
+    const msg = err.message?.toLowerCase() || '';
+    const code = String(err.code || '').toLowerCase();
+    return (
+        msg.includes('unique') ||
+        msg.includes('duplicate') ||
+        code === 'er_dup_entry' ||
+        code === '23505' ||
+        code === '2067'
+    );
+}
+
 export class ShareRepository {
     constructor(private db: any) {}
 
@@ -59,6 +78,32 @@ export class ShareRepository {
         return true;
     }
 
+    async createReplacingShareLink(input: NewShareLink): Promise<{ share: ShareLink; replacedShares: ShareLink[] }> {
+        const revokedAt = Number(input.createdAt);
+        const activeShareKey = createActiveShareKey(input.ownerId as string, input.vaultItemId as string);
+        const replacedSharesById = new Map<string, ShareLink>();
+
+        for (let attempt = 0; attempt < ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS; attempt += 1) {
+            for (const share of await this.revokeActiveForOwnerVaultItem(input.ownerId as string, input.vaultItemId as string, revokedAt)) {
+                replacedSharesById.set(share.id, share);
+            }
+
+            try {
+                const share = await this.createShareLink({
+                    ...input,
+                    activeShareKey,
+                } as NewShareLink);
+                return { share, replacedShares: Array.from(replacedSharesById.values()) };
+            } catch (error) {
+                if (!isUniqueConflict(error) || attempt === ACTIVE_SHARE_REPLACE_MAX_ATTEMPTS - 1) {
+                    throw error;
+                }
+            }
+        }
+
+        throw new Error('share_replace_conflict');
+    }
+
     async revokeActiveForOwnerVaultItem(ownerId: string, vaultItemId: string, revokedAt: number): Promise<ShareLink[]> {
         const activeShares = await this.db
             .select()
@@ -70,18 +115,13 @@ export class ShareRepository {
                 gt(shareLinks.expiresAt, revokedAt),
             ));
 
-        if (activeShares.length === 0) {
-            return [];
-        }
-
         await this.db
             .update(shareLinks)
-            .set({ revokedAt })
+            .set({ revokedAt, activeShareKey: null })
             .where(and(
                 eq(shareLinks.ownerId, ownerId),
                 eq(shareLinks.vaultItemId, vaultItemId),
                 isNull(shareLinks.revokedAt),
-                gt(shareLinks.expiresAt, revokedAt),
             ));
 
         return activeShares;

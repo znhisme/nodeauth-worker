@@ -87,6 +87,7 @@ const BASE_SCHEMA: string[] = [
         owner_id TEXT NOT NULL,
         token_hash TEXT NOT NULL,
         access_code_hash TEXT NOT NULL,
+        active_share_key TEXT,
         expires_at INTEGER NOT NULL,
         revoked_at INTEGER,
         created_at INTEGER NOT NULL,
@@ -132,6 +133,7 @@ const MYSQL_SHARE_BASE_SCHEMA: string[] = [
         owner_id VARCHAR(255) NOT NULL,
         token_hash VARCHAR(255) NOT NULL,
         access_code_hash VARCHAR(255) NOT NULL,
+        active_share_key VARCHAR(320),
         expires_at BIGINT NOT NULL,
         revoked_at BIGINT,
         created_at BIGINT NOT NULL,
@@ -339,6 +341,7 @@ const MIGRATIONS: Migration[] = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at INTEGER NOT NULL,
                 revoked_at INTEGER,
                 created_at INTEGER NOT NULL,
@@ -368,6 +371,7 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -378,6 +382,7 @@ const MIGRATIONS: Migration[] = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at INTEGER NOT NULL,
                 revoked_at INTEGER,
                 created_at INTEGER NOT NULL,
@@ -407,6 +412,7 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -417,6 +423,7 @@ const MIGRATIONS: Migration[] = [
                 owner_id VARCHAR(255) NOT NULL,
                 token_hash VARCHAR(255) NOT NULL,
                 access_code_hash VARCHAR(255) NOT NULL,
+                active_share_key VARCHAR(320),
                 expires_at BIGINT NOT NULL,
                 revoked_at BIGINT,
                 created_at BIGINT NOT NULL,
@@ -446,6 +453,7 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
         `,
@@ -456,6 +464,7 @@ const MIGRATIONS: Migration[] = [
                 owner_id TEXT NOT NULL,
                 token_hash TEXT NOT NULL,
                 access_code_hash TEXT NOT NULL,
+                active_share_key TEXT,
                 expires_at BIGINT NOT NULL,
                 revoked_at BIGINT,
                 created_at BIGINT NOT NULL,
@@ -485,8 +494,133 @@ const MIGRATIONS: Migration[] = [
             CREATE INDEX IF NOT EXISTS idx_share_links_owner ON share_links(owner_id, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_links_token_hash ON share_links(token_hash);
             CREATE INDEX IF NOT EXISTS idx_share_links_expires_at ON share_links(expires_at);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
             CREATE INDEX IF NOT EXISTS idx_share_audit_share_time ON share_audit_events(share_id, event_at DESC);
             CREATE INDEX IF NOT EXISTS idx_share_rate_limits_locked_until ON share_rate_limits(locked_until);
+        `
+    },
+    {
+        version: 14,
+        name: 'add_active_share_uniqueness_guard',
+        sqlite: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        )
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+        d1: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        )
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > CAST(strftime('%s', 'now') AS INTEGER) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+        mysql: `
+            ALTER TABLE share_links ADD COLUMN active_share_key VARCHAR(320);
+            UPDATE share_links
+                SET revoked_at = UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        ) AS retained_active_shares
+                    );
+            UPDATE share_links
+                SET active_share_key = CONCAT(owner_id, ':', vault_item_id)
+                WHERE revoked_at IS NULL
+                    AND expires_at > UNIX_TIMESTAMP(CURRENT_TIMESTAMP(3)) * 1000;
+            CREATE UNIQUE INDEX idx_share_links_active_share_key ON share_links(active_share_key);
+        `,
+        postgres: `
+            ALTER TABLE share_links ADD COLUMN active_share_key TEXT;
+            UPDATE share_links
+                SET revoked_at = EXTRACT(EPOCH FROM NOW()) * 1000
+                WHERE revoked_at IS NULL
+                    AND expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                    AND id NOT IN (
+                        SELECT id FROM (
+                            SELECT id
+                            FROM share_links AS latest
+                            WHERE latest.revoked_at IS NULL
+                                AND latest.expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                                AND latest.id = (
+                                    SELECT newest.id
+                                    FROM share_links AS newest
+                                    WHERE newest.owner_id = latest.owner_id
+                                        AND newest.vault_item_id = latest.vault_item_id
+                                        AND newest.revoked_at IS NULL
+                                        AND newest.expires_at > EXTRACT(EPOCH FROM NOW()) * 1000
+                                    ORDER BY newest.created_at DESC, newest.id DESC
+                                    LIMIT 1
+                                )
+                        ) AS retained_active_shares
+                    );
+            UPDATE share_links
+                SET active_share_key = owner_id || ':' || vault_item_id
+                WHERE revoked_at IS NULL
+                    AND expires_at > EXTRACT(EPOCH FROM NOW()) * 1000;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_share_links_active_share_key ON share_links(active_share_key);
         `
     }
 ];

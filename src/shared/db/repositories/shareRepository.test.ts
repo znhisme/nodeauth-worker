@@ -21,7 +21,16 @@ import { ShareRepository } from '@/shared/db/repositories/shareRepository';
 function createDbMock() {
     const selectWhere = vi.fn();
     const selectLimit = vi.fn();
-    const selectFrom = vi.fn(() => ({ where: selectWhere, limit: selectLimit }));
+    const selectFrom = vi.fn(() => ({
+        where: (...args: any[]) => {
+            const result = selectWhere(...args);
+            return {
+                limit: selectLimit,
+                then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
+            };
+        },
+        limit: selectLimit,
+    }));
     const select = vi.fn(() => ({ from: selectFrom }));
 
     const insertValues = vi.fn().mockResolvedValue(undefined);
@@ -176,7 +185,7 @@ describe('ShareRepository cleanup primitives', () => {
         expect(mock.select).toHaveBeenCalledTimes(1);
         expect(mock.selectFrom).toHaveBeenCalledWith(shareLinks);
         expect(mock.update).toHaveBeenCalledWith(shareLinks);
-        expect(mock.updateSet).toHaveBeenCalledWith({ revokedAt: 2000 });
+        expect(mock.updateSet).toHaveBeenCalledWith({ revokedAt: 2000, activeShareKey: null });
         expect(mock.updateWhere).toHaveBeenCalledTimes(1);
         expect(drizzle.eq).toHaveBeenCalledWith(shareLinks.ownerId, 'owner-1');
         expect(drizzle.eq).toHaveBeenCalledWith(shareLinks.vaultItemId, 'vault-1');
@@ -184,5 +193,80 @@ describe('ShareRepository cleanup primitives', () => {
         expect(drizzle.gt).toHaveBeenCalledWith(shareLinks.expiresAt, 2000);
         expect(JSON.stringify(mock.updateSet.mock.calls[0][0])).not.toContain('token-hash');
         expect(JSON.stringify(mock.updateSet.mock.calls[0][0])).not.toContain('access-hash');
+    });
+
+    it('createReplacingShareLink writes a database-enforced active share key', async () => {
+        const mock = createDbMock();
+        const newShare = {
+            id: 'share-new',
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            tokenHash: 'token-hash',
+            accessCodeHash: 'access-hash',
+            expiresAt: 3000,
+            revokedAt: null,
+            createdAt: 2000,
+            lastAccessedAt: null,
+            accessCount: 0,
+        };
+        const inserted = { ...newShare, activeShareKey: 'owner-1:vault-1' };
+
+        mock.selectWhere.mockResolvedValueOnce([]);
+        mock.selectLimit.mockResolvedValueOnce([inserted]);
+
+        const repo = new ShareRepository(mock.db as any);
+
+        const result = await repo.createReplacingShareLink(newShare as any);
+
+        expect(result).toEqual({ share: inserted, replacedShares: [] });
+        expect(mock.insertValues).toHaveBeenCalledWith({
+            ...newShare,
+            activeShareKey: 'owner-1:vault-1',
+        });
+    });
+
+    it('createReplacingShareLink retries after a unique active-share conflict', async () => {
+        const mock = createDbMock();
+        const oldShare = {
+            id: 'share-old',
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            tokenHash: 'old-token-hash',
+            accessCodeHash: 'old-access-hash',
+            expiresAt: 3000,
+            revokedAt: null,
+            createdAt: 1000,
+            lastAccessedAt: null,
+            accessCount: 0,
+        };
+        const newShare = {
+            id: 'share-new',
+            ownerId: 'owner-1',
+            vaultItemId: 'vault-1',
+            tokenHash: 'new-token-hash',
+            accessCodeHash: 'new-access-hash',
+            expiresAt: 4000,
+            revokedAt: null,
+            createdAt: 2000,
+            lastAccessedAt: null,
+            accessCount: 0,
+        };
+        const inserted = { ...newShare, activeShareKey: 'owner-1:vault-1' };
+
+        mock.selectWhere
+            .mockResolvedValueOnce([oldShare])
+            .mockResolvedValueOnce([oldShare]);
+        mock.selectLimit.mockResolvedValueOnce([inserted]);
+        mock.insertValues
+            .mockRejectedValueOnce(Object.assign(new Error('UNIQUE constraint failed: share_links.active_share_key'), { code: '2067' }))
+            .mockResolvedValueOnce(undefined);
+
+        const repo = new ShareRepository(mock.db as any);
+
+        const result = await repo.createReplacingShareLink(newShare as any);
+
+        expect(result).toEqual({ share: inserted, replacedShares: [oldShare] });
+        expect(mock.insertValues).toHaveBeenCalledTimes(2);
+        expect(mock.updateSet).toHaveBeenCalledWith({ revokedAt: 2000, activeShareKey: null });
     });
 });

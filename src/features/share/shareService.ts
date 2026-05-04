@@ -86,7 +86,26 @@ export class ShareService {
             throw new AppError('share_item_inaccessible', 404);
         }
 
-        const replacedShares = await this.shareRepository.revokeActiveForOwnerVaultItem(input.ownerId, input.vaultItemId, now);
+        const rawToken = generateShareToken();
+        const rawAccessCode = generateAccessCode();
+        const pepper = getShareSecretPepper(this.env);
+        const tokenHash = await hashShareSecret(pepper, 'share-token', rawToken);
+        const accessCodeHash = await hashShareSecret(pepper, 'share-access-code', rawAccessCode);
+        const shareId = createId('share');
+
+        const { share, replacedShares } = await this.shareRepository.createReplacingShareLink({
+            id: shareId,
+            vaultItemId: input.vaultItemId,
+            ownerId: input.ownerId,
+            tokenHash,
+            accessCodeHash,
+            expiresAt,
+            revokedAt: null,
+            createdAt: now,
+            lastAccessedAt: null,
+            accessCount: 0,
+        });
+
         for (const replacedShare of replacedShares) {
             await this.shareRepository.insertAuditEvent({
                 id: createId('share-audit'),
@@ -103,26 +122,6 @@ export class ShareService {
                 }),
             });
         }
-
-        const rawToken = generateShareToken();
-        const rawAccessCode = generateAccessCode();
-        const pepper = getShareSecretPepper(this.env);
-        const tokenHash = await hashShareSecret(pepper, 'share-token', rawToken);
-        const accessCodeHash = await hashShareSecret(pepper, 'share-access-code', rawAccessCode);
-        const shareId = createId('share');
-
-        const share = await this.shareRepository.createShareLink({
-            id: shareId,
-            vaultItemId: input.vaultItemId,
-            ownerId: input.ownerId,
-            tokenHash,
-            accessCodeHash,
-            expiresAt,
-            revokedAt: null,
-            createdAt: now,
-            lastAccessedAt: null,
-            accessCount: 0,
-        });
 
         const publicOrigin = input.publicOrigin || this.env.NODEAUTH_PUBLIC_ORIGIN;
         const publicUrl = publicOrigin ? buildShareUrl(publicOrigin, rawToken) : undefined;

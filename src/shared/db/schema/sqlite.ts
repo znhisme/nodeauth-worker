@@ -28,6 +28,7 @@ export const shareLinks = sqliteTable('share_links', {
   ownerId: text('owner_id').notNull(),
   tokenHash: text('token_hash').notNull(),
   accessCodeHash: text('access_code_hash').notNull(),
+  activeShareKey: text('active_share_key'),
   expiresAt: integer('expires_at').notNull(),
   revokedAt: integer('revoked_at'),
   createdAt: integer('created_at').notNull(),
