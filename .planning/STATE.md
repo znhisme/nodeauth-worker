@@ -127,7 +127,7 @@ None yet.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 260504-h9f | fix Phase 04 latest-share-wins concurrency security gap | 2026-05-04 | pending | [260504-h9f-fix-phase-04-latest-share-wins-concurren](./quick/260504-h9f-fix-phase-04-latest-share-wins-concurren/) |
+| 260504-h9f | fix Phase 04 latest-share-wins concurrency security gap | 2026-05-04 | 46f45c1 | [260504-h9f-fix-phase-04-latest-share-wins-concurren](./quick/260504-h9f-fix-phase-04-latest-share-wins-concurren/) |
 | 260504-5fy | commit and push share management UI fix and ignore local runtime files | 2026-05-03 | 2e3cf64 | [260504-5fy-commit-and-push-share-management-ui-fix-](./quick/260504-5fy-commit-and-push-share-management-ui-fix-/) |
 
 ## Deferred Items
