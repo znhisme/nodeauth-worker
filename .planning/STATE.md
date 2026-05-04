@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-api-token-api-api-token-01-PLAN.md
-last_updated: "2026-05-04T13:15:09.457Z"
+status: verifying
+stopped_at: Completed 05-api-token-api-api-token-02-PLAN.md
+last_updated: "2026-05-04T13:24:59.397Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 30
-  completed_plans: 29
-  percent: 97
+  completed_plans: 30
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-05-02)
 
 ## Current Position
 
-Phase: 05 (api-token-api-api-token) — EXECUTING
+Phase: 05 (api-token-api-api-token) — COMPLETE
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-04
 
-Progress: [██████████] 97%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -71,6 +71,7 @@ Progress: [██████████] 97%
 | Phase 03 P10 | 8min | 2 tasks | 4 files |
 | Phase 03 P11 | 5min | 2 tasks | 6 files |
 | Phase 05-api-token-api-api-token P01 | 5min | 2 tasks | 3 files |
+| Phase 05-api-token-api-api-token P02 | 4min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 03-cleanup-compatibility-and-hardening]: Leave .planning/source-provenance.md unchanged because source-map verification passed after regeneration.
 - [Phase 05-api-token-api-api-token]: Use the existing /api/vault/import route for API-token import rather than adding a second parser or endpoint. — This preserves existing import parsing and keeps automation clients on the same VaultService.importAccounts() contract as browser imports.
 - [Phase 05-api-token-api-api-token]: Prefer cookie auth over Bearer auth when both are present so browser requests still require double-submit CSRF. — Cookie precedence prevents an Authorization header from weakening CSRF enforcement for cookie-authenticated browser requests.
+- [Phase 05-api-token-api-api-token]: Treat generated runtime bundles as acceptable only after source tests pass and build-script regeneration proves reproducibility. — Prevents backend/dist drift from bypassing source-level Bearer import tests.
+- [Phase 05-api-token-api-api-token]: Use structured JSON source-map checks for exact source path assertions because generated maps are single-line JSON. — Keeps source-map verification precise while avoiding unusable raw grep output.
 
 ### Roadmap Evolution
 
@@ -147,6 +150,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-04T13:14:40.480Z
-Stopped at: Completed 05-api-token-api-api-token-01-PLAN.md
+Last session: 2026-05-04T13:24:50.712Z
+Stopped at: Completed 05-api-token-api-api-token-02-PLAN.md
 Resume file: None
